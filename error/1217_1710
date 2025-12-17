@@ -1,0 +1,15 @@
+TE23091G@leecs-cpc028:~/mtk/test3$ make test3
+make  LIB_JIKKEN=~/.local/lib/soft-jikken -f Makefile.3
+make[1]: ディレクトリ '/home/students/23nen/1TE23091G/mtk/test3' に入ります
+LANG=C LC_ALL=C m68k-elf-gcc -c -g -O2 -Wall -fomit-frame-pointer -m68000 -msoft-float -I.  -Wa,-ahls=csys68k.glis -o csys68k.o csys68k.c
+LANG=C LC_ALL=C m68k-elf-as -m68000  -ahls=inchrw.glis -o inchrw.o inchrw.s
+LANG=C LC_ALL=C m68k-elf-as -m68000  -ahls=mtk_asm.glis -o mtk_asm.o mtk_asm.s
+LANG=C LC_ALL=C m68k-elf-gcc -c -g -O2 -Wall -fomit-frame-pointer -m68000 -msoft-float -I.  -Wa,-ahls=mtk_c.glis -o mtk_c.o mtk_c.c
+LANG=C LC_ALL=C m68k-elf-as -m68000  -ahls=outchr.glis -o outchr.o outchr.s
+outchr.s: Assembler messages:
+outchr.s:11: Error: operands mismatch -- statement `addi.l #27,%a0' ignored
+make[1]: *** [/home/students/3160229263/.local/lib/soft-jikken/make.conf:40: outchr.o] エラー 1
+make[1]: ディレクトリ '/home/students/23nen/1TE23091G/mtk/test3' から出ます
+make: *** [Makefile:25: test3] エラー 2
+1TE23091G@leecs-cpc028:~/mtk/test3$ 
+
