@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdarg.h>
 
 /* =========================================================
@@ -268,4 +269,33 @@ void task_b_func(void) {
         volatile long w;
         for (w = 0; w < 50000; w++);
     }
+}
+
+/* =========================================================
+   6. メイン関数 (test3.c の末尾に追加)
+   ========================================================= */
+
+/* あなたの mtk_c.c にあるタスク登録関数の宣言をここに書く */
+/* 例: extern void tcb_add(void (*func)(void)); など */
+/* 名前がわからない場合は mtk_c.c を確認してください */
+
+/* 外部関数の宣言 (mtk_c.c にある関数名に合わせてください) */
+extern void tcb_add(void (*func)(void)); /* 仮名: tcb_add */
+extern void scheduler(void);             /* 仮名: scheduler */
+
+int main(void) {
+    /* 1. ハードウェアとゲームデータの初期化 */
+    init_uart2();    /* UART2初期化 */
+    init_game();     /* ゲーム構造体初期化 */
+
+    /* 2. タスクの登録 (コメントを外す！) */
+    /* ※関数名は mtk_c.c の実装に合わせて書き換えてください */
+    tcb_add(task_a_func); 
+    tcb_add(task_b_func); 
+
+    /* 3. OSの開始 */
+    /* OSの実装によっては、ここで scheduler() を呼ぶ必要があります */
+    scheduler(); 
+
+    return 0; /* ここには到達しないはず */
 }
