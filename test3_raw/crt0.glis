@@ -1,0 +1,143 @@
+68K GAS  crt0.s 			page 1
+
+
+   1               	        .data
+   2               	        .align 2
+   3               	environ:
+   4 0000 0000 0000 	        .long 0
+   5               	 	.align	2
+   6               	
+   7               	.extern main
+   8               	.extern exit
+   9               	.extern monitor_begin
+  10               	.extern hardware_init_hook
+  11               	.extern software_init_hook
+  12               	.extern atexit
+  13               	.extern __do_global_dtors
+  14               	.extern __bss_start
+  15               	.extern _end
+  16               	
+  17               	.global start
+  18               	
+  19               	.text
+  20               	.even
+  21               		/* See if user supplied their own stack (__stack != 0).  If not, then
+  22               		 * default to using the value of %sp as set by the ROM monitor.
+  23               		 */
+  24 0000 207C 0000 		movel	#__stack, %a0
+  24      0000 
+  25 0006 B1FC 0000 		cmpl	#0, %a0
+  25      0000 
+  26 000c 6702      		jbeq    1f
+  27 000e 2E48      		movel	%a0, %sp
+  28               	1:
+  29               		/* set up initial stack frame */
+  30 0010 4E56 FFF8 		link	%a6, #-8
+  31               	
+  32               		/* zero out the bss section */
+  33 0014 223C 0000 		movel	#__bss_start, %d1
+  33      0000 
+  34 001a 203C 0000 		movel	#_end, %d0
+  34      0000 
+  35 0020 B280      		cmpl	%d0, %d1
+  36 0022 6712      		jbeq	3f
+  37 0024 2041      		movl	%d1, %a0
+  38 0026 9081      		subl	%d1, %d0
+  39 0028 5380      		subql	#1, %d0
+  40               	2:
+  41 002a 4218      		clrb	(%a0)+
+  42 002c 51C8 FFFC 		dbra	%d0, 2b
+  43 0030 4240      		clrw	%d0
+  44 0032 5380      		subql	#1, %d0
+  45 0034 64F4      		jbcc	2b
+  46               	3:
+  47               		/* jmp monitor initialize after making up  bss */
+  48 0036 4EF9 0000 		jmp	monitor_begin
+  48      0000 
+  49               	start:
+  50               		/* monitor returns here.
+  51               		 * re-setup stack for C programs.
+  52               	         * See if user supplied their own stack (__stack != 0).  If not, then
+68K GAS  crt0.s 			page 2
+
+
+  53               		 * default to using the value of %sp as set by the ROM monitor.
+  54               		 */
+  55 003c 207C 0000 		movel	#__stack, %a0
+  55      0000 
+  56 0042 B1FC 0000 		cmpl	#0, %a0
+  56      0000 
+  57 0048 6702      		jbeq    skip
+  58 004a 2E48      		movel	%a0, %sp
+  59               	skip:
+  60               		/* set up initial stack frame */
+  61 004c 4E56 FFF8 		link	%a6, #-8
+  62               	
+  63               		/*
+  64               		 * initialize target specific stuff. Only execute these
+  65               		 * functions it they exist.
+  66               		 */
+  67 0050 41F9 0000 		lea	hardware_init_hook, %a0
+  67      0000 
+  68 0056 B1FC 0000 		cmpl	#0, %a0
+  68      0000 
+  69 005c 6702      		jbeq	4f
+  70 005e 4E90      		jsr     (%a0)
+  71               	4:
+  72 0060 41F9 0000 		lea	software_init_hook, %a0
+  72      0000 
+  73 0066 B1FC 0000 		cmpl	#0, %a0
+  73      0000 
+  74 006c 6702      		jbeq	5f
+  75 006e 4E90      		jsr     (%a0)
+  76               	5:
+  77               	
+  78               		/*
+  79               		 * call the main routine from the application to get it going.
+  80               		 * main (argc, argv, environ)
+  81               		 * we pass argv as a pointer to NULL.
+  82               		 */
+  83               	
+  84               		/* put __do_global_dtors in the atexit list so 
+  85               		 * the destructors get run */
+  86               	/* 
+  87               		movel	#__do_global_dtors,(%sp)
+  88               		jsr	atexit
+  89               		movel	#__FINI_SECTION__,(%sp)
+  90               		jsr	atexit
+  91               		jsr	__INIT_SECTION__
+  92               	*/
+  93               		
+  94               		** setup argv, argc and jump into main
+  95 0070 4878 0000 	        pea     0
+  96 0074 4879 0000 	        pea     environ
+  96      0000 
+  97 007a 486F 0004 	        pea     %sp@(4)
+  98 007e 4878 0000 	        pea     0
+  99 0082 4EB9 0000 		jsr	main
+  99      0000 
+ 100 0088 2F00      		movel	%d0, %sp@-
+ 101               	
+68K GAS  crt0.s 			page 3
+
+
+ 102 008a 4EB9 0000 	        jsr     exit
+ 102      0000 
+ 103               	.even
+68K GAS  crt0.s 			page 4
+
+
+DEFINED SYMBOLS
+              crt0.s:3      .data:0000000000000000 environ
+              crt0.s:49     .text:000000000000003c start
+              crt0.s:59     .text:000000000000004c skip
+
+UNDEFINED SYMBOLS
+__stack
+__bss_start
+_end
+monitor_begin
+hardware_init_hook
+software_init_hook
+main
+exit
