@@ -1,5 +1,5 @@
-extern void outbyte(unsigned char c);
-extern char inbyte();
+extern void outbyte(unsigned char c,int fd);
+extern char inbyte(int fd);
 
 int read(int fd, char *buf, int nbytes)
 {
