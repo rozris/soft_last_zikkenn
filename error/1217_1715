@@ -1,0 +1,27 @@
+1TE23091G@leecs-cpc028:~/mtk/test3$ make test3
+make  LIB_JIKKEN=~/.local/lib/soft-jikken -f Makefile.3
+make[1]: ディレクトリ '/home/students/23nen/1TE23091G/mtk/test3' に入ります
+LANG=C LC_ALL=C m68k-elf-as -m68000  -ahls=outchr.glis -o outchr.o outchr.s
+LANG=C LC_ALL=C m68k-elf-gcc -c -g -O2 -Wall -fomit-frame-pointer -m68000 -msoft-float -I.  -Wa,-ahls=test3.glis -o test3.o test3.c
+test3.c: In function 'gotoxy':
+test3.c:130:5: warning: implicit declaration of function 'sprintf' [-Wimplicit-function-declaration]
+  130 |     sprintf(buf, "\033[%d;%dH", y, x);
+      |     ^~~~~~~
+test3.c:2:1: note: include '<stdio.h>' or provide a declaration of 'sprintf'
+    1 | #include <stdarg.h>
+  +++ |+#include <stdio.h>
+    2 | 
+test3.c:130:5: warning: incompatible implicit declaration of built-in function 'sprintf' [-Wbuiltin-declaration-mismatch]
+  130 |     sprintf(buf, "\033[%d;%dH", y, x);
+      |     ^~~~~~~
+test3.c:130:5: note: include '<stdio.h>' or provide a declaration of 'sprintf'
+test3.c: In function 'draw_screen':
+test3.c:237:5: warning: incompatible implicit declaration of built-in function 'sprintf' [-Wbuiltin-declaration-mismatch]
+  237 |     sprintf(buf, "Score: %d", s->score);
+      |     ^~~~~~~
+test3.c:237:5: note: include '<stdio.h>' or provide a declaration of 'sprintf'
+LANG=C LC_ALL=C m68k-elf-ld -nostdlib --cref crt0.o mon.o csys68k.o inchrw.o mtk_asm.o mtk_c.o outchr.o test3.o -o test3.hex -Map test3.map -L/usr/local/m68k-elf/lib -L/usr/local/lib/gcc/m68k-elf/11 -T ~/.local/lib/soft-jikken/ldscript.cmd
+m68k-elf-ld: crt0.o: in function `skip':
+(.text+0x84): undefined reference to `main'
+make[1]: *** [/home/students/3160229263/.local/lib/soft-jikken/make.conf:57: test3.hex] エラー 1
+make[1]: ディレクトリ '/home/students/23nen/1TE23091G/mtk/test3' から出ます
