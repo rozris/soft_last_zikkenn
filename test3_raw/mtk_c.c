@@ -244,3 +244,41 @@ TASK_ID_TYPE removeq(TASK_ID_TYPE *head) {
 	return t;
 }
 
+//テーマ3UART等関連処理
+#define REGBASE 0xFFF000
+#define IMR     (*(volatile unsigned long *)(REGBASE + 0x304))
+
+/* UART1 (fd=0) */
+#define URX1    (*(volatile unsigned short *)(REGBASE + 0x904))
+#define UTX1    (*(volatile unsigned short *)(REGBASE + 0x906))
+
+/* UART2 (fd=1) */
+#define USTCNT2 (*(volatile unsigned short *)(REGBASE + 0x910))
+#define UBAUD2  (*(volatile unsigned short *)(REGBASE + 0x912))
+#define URX2    (*(volatile unsigned short *)(REGBASE + 0x914))
+#define UTX2    (*(volatile unsigned short *)(REGBASE + 0x916))
+
+#define IMR_UART2_MASK 0x00001000
+
+int set_ipl(int level) {
+    int old_sr;
+    __asm__ volatile ("move.w %%sr, %0" : "=d" (old_sr));
+    if (level == 7) {
+        __asm__ volatile ("move.w #0x2700, %%sr" : :);
+    }
+    return old_sr;
+}
+
+void restore_ipl(int old_sr) {
+    __asm__ volatile ("move.w %0, %%sr" : : "d" (old_sr));
+}
+
+void init_uart2(void) {
+    int lock = set_ipl(7);
+    USTCNT2 = 0x0000;   /* Reset */
+    USTCNT2 = 0xE100;   /* RX/TX Enable */
+    UBAUD2  = 0x0126;   /* 38400 bps */
+    IMR &= ~IMR_UART2_MASK; /* 割り込み許可 */
+    restore_ipl(lock);
+}
+
