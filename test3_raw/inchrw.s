@@ -6,10 +6,12 @@ inbyte:
 movem.l %d1-%d3, -(%sp)
 i_loop:
 move.l #SYSCALL_NUM_GETSTRING, %d0
-move.l #0, %d1 /* ch = 0 */
- move.l #BUF_in, %d2 /* p = #in */
- move.l #1, %d3 /* size = 1 */
- trap #0
+move.l %sp, %a0
+adda.l #20, %a0
+move.l (%a0), %D1 | ch = fd 
+move.l #BUF_in, %d2 /* p = #in */
+move.l #1, %d3 /* size = 1 */
+trap #0
 
  cmpi.l #1, %d0
  bne i_loop /* 文字が取り出されなかったらループ */
