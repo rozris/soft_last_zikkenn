@@ -16,20 +16,20 @@ int read(int fd, char *buf, int nbytes)
  for (i = 0; i < nbytes; i++)
  {
  c = inbyte(ch);
- if (c == '¥r' || c == '¥n') /* CR -> CRLF */
+ if (c == '\r' || c == '\n') /* CR -> CRLF */
  {
- outbyte('¥r', ch);
- outbyte('¥n', ch);
- *(buf + i) = '¥n';
- /* } else if (c == '¥x8'){ */ /* backspace ¥x8 */
+ outbyte('\r', ch);
+ outbyte('\n', ch);
+ *(buf + i) = '\n';
+ /* } else if (c == '\x8'){ */ /* backspace \x8 */
  }
- else if (c == '¥x7f')
-{ /* backspace ¥x8 -> ¥x7f (by terminal config.) */
+ else if (c == '\x7f')
+{ /* backspace \x8 -> \x7f (by terminal config.) */
  if (i > 0)
  {
-outbyte('¥x8', ch); /* bs */
+outbyte('\x8', ch); /* bs */
 outbyte(' ', ch); /* spc */
-outbyte('¥x8', ch); /* bs */
+outbyte('\x8', ch); /* bs */
 i--;
  }
  i--;
@@ -40,7 +40,7 @@ i--;
  outbyte(c, ch);
  *(buf + i) = c;
  }
- if (*(buf + i) == '¥n')
+ if (*(buf + i) == '\n')
  {
  return (i + 1);
  }
@@ -62,8 +62,8 @@ int write (int fd, char *buf, int nbytes)
  else return -1;
  for (i = 0; i < nbytes; i++)
  {
- if (*(buf + i) == '¥n') {
- outbyte ('¥r', ch); /* LF -> CRLF */
+ if (*(buf + i) == '\n') {
+ outbyte ('\r', ch); /* LF -> CRLF */
  }
  outbyte (*(buf + i), ch);
  for (j = 0; j < 300; j++);
