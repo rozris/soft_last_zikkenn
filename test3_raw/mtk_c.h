@@ -63,4 +63,16 @@ extern void pv_handler(void);   /* TRAP #1 ハンドラ (mtk_asm.s) */
 extern void init_timer(void);   /* タイマ初期化 (mtk_asm.s) */
 extern void first_task(void);   /* 最初のタスク起動 (mtk_asm.s) */
 
+
+void init_kernel(void);
+void set_task(void (*func)());
+void begin_sch(void);
+int set_ipl(int level);
+void restore_ipl(int old_sr);
+void init_uart2(void);
+int inkey(int fd);
+void my_write(int fd, char *s);
+void P(int sem_id); /* mtk_asm.s で定義 */
+void V(int sem_id); /* mtk_asm.s で定義 */
+
 #endif
