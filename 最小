@@ -1,0 +1,31 @@
+#include "mtk_c.h"
+
+/* 最小限の出力関数 (IPL操作のみ) */
+void simple_put(int fd, char c) {
+    char s[2] = {c, '\0'};
+    my_write(fd, s);
+}
+
+void player1_task() {
+    while (1) {
+        simple_put(0, '1'); /* UART1へ '1' を出力 */
+        /* 1秒のタイムスライスを待つ（ビジーループ等は不要、OSが切り替える） */
+    }
+}
+
+void player2_task() {
+    while (1) {
+        simple_put(1, '2'); /* UART2へ '2' を出力 */
+    }
+}
+
+int main(void) {
+    init_kernel();
+    init_uart2(); /* UART2を有効化 */
+
+    set_task(player1_task);
+    set_task(player2_task);
+
+    begin_sch(); /* スケジューラ開始 */
+    return 0;
+}
