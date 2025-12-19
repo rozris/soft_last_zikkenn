@@ -118,7 +118,7 @@ void set_task(void (*func)()) {
     for(i = 1; i <= NUMTASK; i++) {
         /* status == 0 を未使用と仮定 */
         if (task_tab[i].status == 0) {
-            new_task = i;
+            new_task = i;　
             break;
         }
     }
