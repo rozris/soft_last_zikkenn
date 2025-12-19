@@ -1,0 +1,26 @@
+TE23091G@leecs-cpc028:~/mtk/test3$ make test3
+make  LIB_JIKKEN=~/.local/lib/soft-jikken -f Makefile.3
+make[1]: ディレクトリ '/home/students/23nen/1TE23091G/mtk/test3' に入ります
+LANG=C LC_ALL=C m68k-elf-gcc -c -g -O2 -Wall -fomit-frame-pointer -m68000 -msoft-float -I.  -Wa,-ahls=csys68k.glis -o csys68k.o csys68k.c
+LANG=C LC_ALL=C m68k-elf-gcc -c -g -O2 -Wall -fomit-frame-pointer -m68000 -msoft-float -I.  -Wa,-ahls=mtk_c.glis -o mtk_c.o mtk_c.c
+LANG=C LC_ALL=C m68k-elf-gcc -c -g -O2 -Wall -fomit-frame-pointer -m68000 -msoft-float -I.  -Wa,-ahls=test3.glis -o test3.o test3.c
+test3.c: In function 'gotoxy':
+test3.c:23:5: warning: implicit declaration of function 'my_write'; did you mean 'fwrite'? [-Wimplicit-function-declaration]
+   23 |     my_write(fd, buf);
+      |     ^~~~~~~~
+      |     fwrite
+test3.c: In function 'player_proc':
+test3.c:56:17: warning: implicit declaration of function 'inkey' [-Wimplicit-function-declaration]
+   56 |         int c = inkey(fd);
+      |                 ^~~~~
+test3.c: In function 'main':
+test3.c:96:5: warning: implicit declaration of function 'init_uart2'; did you mean 'init_app'? [-Wimplicit-function-declaration]
+   96 |     init_uart2();
+      |     ^~~~~~~~~~
+      |     init_app
+LANG=C LC_ALL=C m68k-elf-ld -nostdlib --cref crt0.o mon.o csys68k.o inchrw.o mtk_asm.o mtk_c.o outchr.o test3.o -o test3.hex -Map test3.map -L/usr/local/m68k-elf/lib -L/usr/local/lib/gcc/m68k-elf/11 -T ~/.local/lib/soft-jikken/ldscript.cmd
+m68k-elf-ld: test3.o: in function `player_proc':
+/home/students/3160229263/mtk/test3/test3.c:55: undefined reference to `inkey'
+make[1]: *** [/home/students/3160229263/.local/lib/soft-jikken/make.conf:57: test3.hex] エラー 1
+make[1]: ディレクトリ '/home/students/23nen/1TE23091G/mtk/test3' から出ます
+make: *** [Makefile:25: test3] エラー 2
