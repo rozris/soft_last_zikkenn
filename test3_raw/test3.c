@@ -2,20 +2,12 @@
 #include <stdarg.h>
 #include "mtk_c.h"
 
-/*セマフォID定義*/
-#define SEM_BOARD 0  /* 盤面データの保護 */
-#define SEM_UART  1  /* UART出力(my_write/gotoxy)の排他制御 */
-
-/* ゲーム設定 */
+#define SEM_BOARD 0
+#define SEM_UART  1
 #define BOARD_SIZE 3
+
 char board[BOARD_SIZE][BOARD_SIZE];
-int game_over=0;
-
-/*システム基盤関数*/
-
-/*割り込みレベル設定（タスク切り替え防止のため走行レベルを7に）*/
-
-
+int game_over = 0;
 
 void gotoxy(int fd, int x, int y) {
     char buf[20];
@@ -23,20 +15,11 @@ void gotoxy(int fd, int x, int y) {
     my_write(fd, buf);
 }
 
-/* --- ゲームロジック関数 --- */
-
-void init_app(void) {
-    int i, j;
-    for (i = 0; i < BOARD_SIZE; i++)
-        for (j = 0; j < BOARD_SIZE; j++) board[i][j] = '.';
-}
-
-/* 盤面描画（差分更新） */
 void draw_board(int fd) {
     int i, j;
     P(SEM_UART);
     gotoxy(fd, 1, 1);
-    my_write(fd, "--- Board ---\r\n");
+    my_write(fd, "--- Board (1-9 to move) ---\r\n");
     for (i = 0; i < BOARD_SIZE; i++) {
         for (j = 0; j < BOARD_SIZE; j++) {
             char b[2] = {board[i][j], '\0'};
@@ -48,9 +31,6 @@ void draw_board(int fd) {
     V(SEM_UART);
 }
 
-/* --- タスク実装 --- */
-
-/* 共通プレイヤー処理 */
 void player_proc(int fd, char mark) {
     while (!game_over) {
         int c = inkey(fd);
@@ -58,43 +38,36 @@ void player_proc(int fd, char mark) {
             int pos = c - '1';
             int y = pos / 3;
             int x = pos % 3;
-
             P(SEM_BOARD);
-            if (board[y][x] == '.') {
-                board[y][x] = mark;
-            }
+            if (board[y][x] == '.') board[y][x] = mark;
             V(SEM_BOARD);
         }
         draw_board(fd);
     }
 }
 
-void player1_task(void) {
-    player_proc(0, 'O');
-}
+void player1_task() { player_proc(0, 'O'); }
+void player2_task() { player_proc(1, 'X'); }
 
-void player2_task(void) {
-    player_proc(1, 'X');
-}
-
-/* 審判・爆弾タスク（第3のタスク） */
-void supervisor_task(void) {
-    int counter = 0;
+void supervisor_task() {
+    int count = 0;
     while (!game_over) {
-        counter++;
-        if (counter>10) { /* 約10秒ごとにランダム爆発（簡易） */
+        count++;
+        if (count > 20) { /* 簡易タイマー */
             P(SEM_BOARD);
-            board[1][1] = 'B'; /* 中央を爆破 */
+            /* ここに爆弾ロジック（ランダム消去など）を記述 */
             V(SEM_BOARD);
-            counter=0;
+            count = 0;
         }
     }
 }
 
 int main(void) {
+    int i, j;
     init_kernel();
     init_uart2();
-    init_app();
+    for (i = 0; i < BOARD_SIZE; i++)
+        for (j = 0; j < BOARD_SIZE; j++) board[i][j] = '.';
 
     set_task(player1_task);
     set_task(player2_task);
