@@ -47,6 +47,13 @@ void set_task(void (*func)());
 void begin_sch(void);
 void *init_stack(int id);
 
+//test3関連
+/* mtk_c.h に追加 */
+int inkey(int fd);
+void my_write(int fd, char *s);
+void init_uart2(void);
+
+
 /* 外部関数（他担当またはアセンブリ） */
 extern void P(int ch);
 extern void V(int ch);
