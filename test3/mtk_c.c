@@ -277,15 +277,3 @@ void init_uart2(void) {
     restore_ipl(lock);
 }
 
-
-
-/* 割り込み安全な文字列出力 */
-void my_write(int fd, char *s) {
-    volatile unsigned short *utx = (fd == 0) ? &UTX1 : &UTX2;
-    int lock=set_ipl(7); /* 再入不可対策 */
-    while (*s){
-        *utx = (unsigned short)(*s++);
-    }
-    restore_ipl(lock);
-}
-
