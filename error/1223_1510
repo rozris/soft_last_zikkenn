@@ -1,0 +1,20 @@
+csys68k.c: In function 'read':
+csys68k.c:20:14: error: stray '\' in program
+   20 |  * backspace \x8 -> \x7f (by terminal config.) */
+      |              ^
+csys68k.c:20:4: error: 'backspace' undeclared (first use in this function)
+   20 |  * backspace \x8 -> \x7f (by terminal config.) */
+      |    ^~~~~~~~~
+csys68k.c:20:4: note: each undeclared identifier is reported only once for each function it appears in
+csys68k.c:20:13: error: expected ';' before 'x8'
+   20 |  * backspace \x8 -> \x7f (by terminal config.) */
+      |             ^ ~~
+      |             ;
+csys68k.c:20:21: error: stray '\' in program
+   20 |  * backspace \x8 -> \x7f (by terminal config.) */
+      |                     ^
+csys68k.c:28:2: error: continue statement not within a loop
+   28 |  continue;
+      |  ^~~~~~~~
+make[1]: *** [/home/students/3160229263/.local/lib/soft-jikken/make.conf:43: csys68k.o] エラー 1
+make[1]: ディレクトリ '/home/students/23nen/1TE23091G/mtk/test3' から出ます
