@@ -2,10 +2,15 @@
 #include <stdarg.h>
 #include "mtk_c.h"
 
+/* --- 外部関数宣言 --- */
+extern void sw_task(void);
+extern int inkey(int fd);
+
 #define BOARD_SIZE 3
 #define SEM_BOARD 0
 #define SEM_UART  1
 
+/* --- 盤面データ構造体 (静的確保) --- */
 typedef struct {
     char cells[BOARD_SIZE][BOARD_SIZE];
 } BOARD_DATA;
@@ -14,13 +19,12 @@ typedef struct {
 BOARD_DATA game_board;
 int game_over = 0;
 
-/* --- 描画関数 (画面崩れ対策: 行バッファ送信) --- */
+/* --- 描画関数 --- */
 void draw_board(int fd) {
     int i;
     char row_buf[32];
 
     P(SEM_UART);
-    // 画面消去とカーソルホーム (ANSIエスケープ)
     my_write(fd, "\033[2J\033[H"); 
     my_write(fd, "=== Survival Tic-Tac-Toe ===\r\n");
     my_write(fd, "YOU: O | CPU: X | BOMB: Clear\r\n\r\n");
@@ -37,14 +41,14 @@ void draw_board(int fd) {
     V(SEM_UART);
 }
 
-/* タスク1: プレイヤー (入力の反映を改善) --- */
+/* --- タスク1: プレイヤー --- */
 void player_task() {
     while (!game_over) {
         int c = inkey(0);
         
-        // 入力がない時は yield() で他のタスク（CPUやBomber）に実行権を譲る
-        if (c == -1 || c == 0) {
-            yield(); 
+        // 入力がない、あるいはアセンブラ側の不整合(0)の時はタスクを切り替える
+        if (c <= 0) {
+            sw_task(); 
             continue;
         }
 
@@ -54,24 +58,23 @@ void player_task() {
             int x = pos % 3;
 
             P(SEM_BOARD);
-            // プレイヤーが置けるのは '.' の場所のみ
             if (game_board.cells[y][x] == '.') {
                 game_board.cells[y][x] = 'O';
+                V(SEM_BOARD);
+                draw_board(0);
+            } else {
+                V(SEM_BOARD);
             }
-            V(SEM_BOARD);
-            
-            draw_board(0);
         }
     }
 }
 
-/* --- タスク2: CPU (占有を防ぐために sleep/yield を追加) --- */
+/* --- タスク2: CPU --- */
 void cpu_task() {
     while (!game_over) {
-        // 長いビジーループの代わりに、OSのタイマー機能があれば sleep を推奨
-        // ない場合は、定期的に yield() を呼び出す
+        // CPUの待機時間（sw_taskを挟んで占有を回避）
         for (volatile int d = 0; d < 1000000; d++) {
-            if (d % 1000 == 0) yield(); 
+            if (d % 1000 == 0) sw_task(); 
         }
 
         P(SEM_BOARD);
@@ -80,60 +83,52 @@ void cpu_task() {
             if (game_board.cells[i / 3][i % 3] == '.') {
                 game_board.cells[i / 3][i % 3] = 'X';
                 placed = 1;
-                break; // 1つ置いたら終了
+                break;
             }
         }
         V(SEM_BOARD);
-        
         if (placed) draw_board(0);
     }
 }
 
-/* --- タスク3: ボンバー (CPUと実行権を食い合わないように調整) --- */
+/* --- タスク3: ボンバー --- */
 void bomber_task() {
     int target = 0;
     while (!game_over) {
+        // ボンバーの待機時間
         for (volatile int d = 0; d < 1500000; d++) {
-            if (d % 1000 == 0) yield();
+            if (d % 1000 == 0) sw_task();
         }
 
         P(SEM_BOARD);
-        // 常に巡回し、'.' 以外なら消去
         if (game_board.cells[target / 3][target % 3] != '.') {
             game_board.cells[target / 3][target % 3] = '.';
+            V(SEM_BOARD);
+            draw_board(0);
+        } else {
+            V(SEM_BOARD);
         }
-        V(SEM_BOARD);
         
         target = (target + 1) % 9;
-        draw_board(0);
     }
 }
 
 /* --- メイン関数 --- */
 int main(void) {
     int i, j;
-
-    // カーネル初期化 (ここにUART初期化も含まれる)
     init_kernel();
+    /* セマフォの初期化は init_kernel() 等で実行済みと想定 */
 
-    // セマフォの手動初期化
-    semaphore[SEM_BOARD].count = 1;
-    semaphore[SEM_UART].count = 1;
-
-    // 盤面の初期化
     for (i = 0; i < BOARD_SIZE; i++) {
         for (j = 0; j < BOARD_SIZE; j++) {
             game_board.cells[i][j] = '.';
         }
     }
 
-    // 3並列タスクの設定
     set_task(player_task);
     set_task(cpu_task);
     set_task(bomber_task);
 
-    // マルチタスク開始
     begin_sch();
-
     return 0;
 }
