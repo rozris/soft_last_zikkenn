@@ -3,23 +3,14 @@
 #include "mtk_c.h"
 
 #define BOARD_SIZE 3
-#define NUMSEMAPHORE 2
 #define SEM_BOARD 0
 #define SEM_UART  1
-
-/* --- 構造体定義 (静的確保用) --- */
-typedef struct {
-    int count;
-    int nst;
-    TASK_ID_TYPE task_list;
-} SEMAPHORE_TYPE;
 
 typedef struct {
     char cells[BOARD_SIZE][BOARD_SIZE];
 } BOARD_DATA;
 
 /* --- 静的グローバル変数 --- */
-SEMAPHORE_TYPE semaphore[NUMSEMAPHORE];
 BOARD_DATA game_board;
 int game_over = 0;
 
