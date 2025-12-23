@@ -2,146 +2,131 @@
 #include <stdarg.h>
 #include "mtk_c.h"
 
-/* --- 定数定義 --- */
 #define BOARD_SIZE 3
 #define NUMSEMAPHORE 2
 #define SEM_BOARD 0
 #define SEM_UART  1
 
-/* --- 構造体定義 (ベクトル/ヒープを使わない固定長管理) --- */
-
-/* セマフォ管理構造体 */
+/* --- 構造体定義 (静的確保用) --- */
 typedef struct {
     int count;
-    int nst;                /* 予約領域 */
-    TASK_ID_TYPE task_list; /* 待ちタスクのリスト */
+    int nst;
+    TASK_ID_TYPE task_list;
 } SEMAPHORE_TYPE;
 
-/* 盤面データ構造体 */
 typedef struct {
     char cells[BOARD_SIZE][BOARD_SIZE];
-    int width;
-    int height;
 } BOARD_DATA;
 
-/* --- グローバル変数 (静的確保) --- */
+/* --- 静的グローバル変数 --- */
 SEMAPHORE_TYPE semaphore[NUMSEMAPHORE];
 BOARD_DATA game_board;
 int game_over = 0;
 
-/* --- 補助関数 (画面制御) --- */
-
-void gotoxy(int fd, int x, int y) {
-    char buf[20];
-    /* sprintfは標準ライブラリのスタック利用なのでヒープは使いません */
-    sprintf(buf, "\033[%d;%dH", y, x);
-    my_write(fd, buf);
-}
-
+/* --- 描画関数 (画面崩れ対策: 行バッファ送信) --- */
 void draw_board(int fd) {
-    int i, j;
-    char cell_str[2] = {' ', '\0'};
+    int i;
+    char row_buf[32];
 
     P(SEM_UART);
-    gotoxy(fd, 1, 1);
-    my_write(fd, "--- Board (1-9 to move) ---\r\n");
+    // 画面消去とカーソルホーム (ANSIエスケープ)
+    my_write(fd, "\033[2J\033[H"); 
+    my_write(fd, "=== Survival Tic-Tac-Toe ===\r\n");
+    my_write(fd, "YOU: O | CPU: X | BOMB: Clear\r\n\r\n");
 
-    for (i = 0; i < game_board.height; i++) {
-        for (j = 0; j < game_board.width; j++) {
-            cell_str[0] = game_board.cells[i][j];
-            my_write(fd, cell_str);
-            my_write(fd, " ");
-        }
-        my_write(fd, "\r\n");
+    for (i = 0; i < BOARD_SIZE; i++) {
+        sprintf(row_buf, "  %c | %c | %c \r\n", 
+                game_board.cells[i][0], 
+                game_board.cells[i][1], 
+                game_board.cells[i][2]);
+        my_write(fd, row_buf);
+        if (i < 2) my_write(fd, " ---+---+---\r\n");
     }
+    my_write(fd, "\r\nInput (1-9): ");
     V(SEM_UART);
 }
 
-/* --- 各タスクの実装 --- */
-
-/* プレイヤー処理の共通ロジック */
-void player_proc(int fd, char mark) {
+/* --- タスク1: プレイヤー (UART 0からの入力) --- */
+void player_task() {
     while (!game_over) {
-        int c = inkey(fd); /* キー入力待ち */
+        int c = inkey(0);
         if (c >= '1' && c <= '9') {
             int pos = c - '1';
-            int y = pos / 3;
-            int x = pos % 3;
-
             P(SEM_BOARD);
-            if (game_board.cells[y][x] == '.') {
-                game_board.cells[y][x] = mark;
+            if (game_board.cells[pos / 3][pos % 3] == '.') {
+                game_board.cells[pos / 3][pos % 3] = 'O';
             }
             V(SEM_BOARD);
+            draw_board(0);
         }
-        draw_board(fd);
     }
 }
 
-/* タスク1: プレイヤー1 (UART 0) */
-void player1_task() {
-    player_proc(0, 'O');
-}
-
-/* タスク2: プレイヤー2 (UART 1) */
-void player2_task() {
-    player_proc(1, 'X');
-}
-
-/* タスク3: 監視タスク (爆弾ロジック) */
-void supervisor_task() {
-    int count = 0;
-    int bomb_pos = 0;
-
+/* --- タスク2: CPU (敵の自動着手) --- */
+void cpu_task() {
+    int pos = 0;
     while (!game_over) {
-        /* 簡易タイマー: マルチタスクの切り替えを待つ */
-        for(count = 0; count < 10000; count++); 
+        // 簡易的な時間待ち (環境に合わせて調整)
+        for (volatile int d = 0; d < 1000000; d++); 
 
         P(SEM_BOARD);
-        /* 1マスずつ順番に「消去」して回る簡易爆弾ロジック */
-        int y = bomb_pos / 3;
-        int x = bomb_pos % 3;
-        if (game_board.cells[y][x] != '.') {
-            game_board.cells[y][x] = '.'; 
+        // 空いている場所を探して 'X' を置く
+        int placed = 0;
+        for (int i = 0; i < 9; i++) {
+            if (game_board.cells[i / 3][i % 3] == '.') {
+                game_board.cells[i / 3][i % 3] = 'X';
+                placed = 1;
+                break;
+            }
         }
         V(SEM_BOARD);
+        if (placed) draw_board(0);
+    }
+}
 
-        bomb_pos = (bomb_pos + 1) % 9;
-        draw_board(0); /* UART 0側に状況を反映 */
+/* --- タスク3: ボンバー (ランダム消去タスク) --- */
+void bomber_task() {
+    int target = 0;
+    while (!game_over) {
+        // CPUより少し遅い周期で巡回
+        for (volatile int d = 0; d < 1500000; d++); 
+
+        P(SEM_BOARD);
+        // 埋まっているマスを強制的にクリアする
+        if (game_board.cells[target / 3][target % 3] != '.') {
+            game_board.cells[target / 3][target % 3] = '.';
+        }
+        V(SEM_BOARD);
+        
+        target = (target + 1) % 9;
+        draw_board(0);
     }
 }
 
 /* --- メイン関数 --- */
-
 int main(void) {
     int i, j;
 
-    /* カーネル初期化 */
+    // カーネル初期化 (ここにUART初期化も含まれる)
     init_kernel();
-    init_uart2();
 
-    /* セマフォの手動初期化 (構造体配列) */
-    semaphore[SEM_BOARD].count = 1;      /* 盤面アクセス権 */
-    semaphore[SEM_BOARD].task_list = 0;
-    
-    semaphore[SEM_UART].count = 1;       /* 画面表示アクセス権 */
-    semaphore[SEM_UART].task_list = 0;
+    // セマフォの手動初期化
+    semaphore[SEM_BOARD].count = 1;
+    semaphore[SEM_UART].count = 1;
 
-    /* 盤面構造体の初期化 */
-    game_board.width = BOARD_SIZE;
-    game_board.height = BOARD_SIZE;
+    // 盤面の初期化
     for (i = 0; i < BOARD_SIZE; i++) {
         for (j = 0; j < BOARD_SIZE; j++) {
             game_board.cells[i][j] = '.';
         }
     }
 
-    /* タスクの登録 */
-    set_task(player1_task);
-    set_task(player2_task);
-    set_task(supervisor_task);
+    // 3並列タスクの設定
+    set_task(player_task);
+    set_task(cpu_task);
+    set_task(bomber_task);
 
-    /* スケジューリング開始 */
+    // マルチタスク開始
     begin_sch();
 
     return 0;
