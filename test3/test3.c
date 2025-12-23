@@ -2,7 +2,7 @@
 #include <stdarg.h>
 #include "mtk_c.h"
 
-extern void sw_task(void);
+/* --- 外部関数の宣言 --- */
 extern int inkey(int fd);
 
 #define BOARD_SIZE 5
@@ -35,7 +35,7 @@ char check_winner() {
             game_board.cells[2][j] == game_board.cells[3][j] &&
             game_board.cells[3][j] == game_board.cells[4][j]) return game_board.cells[0][j];
     }
-    // 斜めの判定
+    // 斜めの判定 (主対角・副対角)
     if (game_board.cells[2][2] != '.') {
         if (game_board.cells[0][0] == game_board.cells[1][1] && game_board.cells[1][1] == game_board.cells[2][2] &&
             game_board.cells[2][2] == game_board.cells[3][3] && game_board.cells[3][3] == game_board.cells[4][4]) return game_board.cells[2][2];
@@ -43,13 +43,14 @@ char check_winner() {
             game_board.cells[2][2] == game_board.cells[3][1] && game_board.cells[3][1] == game_board.cells[4][0]) return game_board.cells[2][2];
     }
 
-    // 引き分けチェック
+    // 引き分けチェック (空きマスの有無)
     for (i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) 
         if (game_board.cells[i/BOARD_SIZE][i%BOARD_SIZE] == '.') return 0;
+    
     return 'D';
 }
 
-/* --- 描画関数 (正方形に近い見た目へ) --- */
+/* --- 描画関数 --- */
 void draw_board(int fd, char* msg) {
     int i;
     char row_buf[128];
@@ -90,7 +91,7 @@ void player_task() {
     
     while (!game_over) {
         int c = inkey(0);
-        if (c <= 0 || c == 10 || c == 13) { sw_task(); continue; }
+        if (c <= 0 || c == 10 || c == 13) continue;
 
         if (c >= '1' && c <= '5') {
             if (y == -1) {
@@ -114,35 +115,41 @@ void player_task() {
     }
 }
 
-/* --- CPU：高速着手 --- */
+/* --- CPU：着手タスク --- */
 void cpu_task() {
     while (!game_over) {
-        for (volatile int d = 0; d < 500000; d++) if (d % 1000 == 0) sw_task(); 
+        // ビジーループによる時間稼ぎ
+        for (volatile int d = 0; d < 800000; d++); 
 
         P(SEM_BOARD);
+        int placed = 0;
         for (int i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
             if (game_board.cells[i/BOARD_SIZE][i%BOARD_SIZE] == '.') {
                 game_board.cells[i/BOARD_SIZE][i%BOARD_SIZE] = 'X';
+                placed = 1;
                 break;
             }
         }
         V(SEM_BOARD);
-        draw_board(0, "CPU moved.");
+        if (placed) draw_board(0, "CPU moved.");
     }
 }
 
-/* --- ボンバー：ランダム巡回消去 --- */
+/* --- ボンバー：消去タスク --- */
 void bomber_task() {
     int target = 0;
     while (!game_over) {
-        for (volatile int d = 0; d < 1200000; d++) if (d % 1000 == 0) sw_task(); 
+        for (volatile int d = 0; d < 1800000; d++); 
+        
         P(SEM_BOARD);
         if (game_board.cells[target/BOARD_SIZE][target%BOARD_SIZE] != '.') {
             game_board.cells[target/BOARD_SIZE][target%BOARD_SIZE] = '.';
+            V(SEM_BOARD);
+            draw_board(0, "Bomb ticking...");
+        } else {
+            V(SEM_BOARD);
         }
-        V(SEM_BOARD);
         target = (target + 1) % (BOARD_SIZE * BOARD_SIZE);
-        draw_board(0, "Bomb ticking...");
     }
 }
 
