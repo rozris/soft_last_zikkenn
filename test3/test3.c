@@ -37,53 +37,68 @@ void draw_board(int fd) {
     V(SEM_UART);
 }
 
-/* --- タスク1: プレイヤー (UART 0からの入力) --- */
+/* タスク1: プレイヤー (入力の反映を改善) --- */
 void player_task() {
     while (!game_over) {
         int c = inkey(0);
+        
+        // 入力がない時は yield() で他のタスク（CPUやBomber）に実行権を譲る
+        if (c == -1 || c == 0) {
+            yield(); 
+            continue;
+        }
+
         if (c >= '1' && c <= '9') {
             int pos = c - '1';
+            int y = pos / 3;
+            int x = pos % 3;
+
             P(SEM_BOARD);
-            if (game_board.cells[pos / 3][pos % 3] == '.') {
-                game_board.cells[pos / 3][pos % 3] = 'O';
+            // プレイヤーが置けるのは '.' の場所のみ
+            if (game_board.cells[y][x] == '.') {
+                game_board.cells[y][x] = 'O';
             }
             V(SEM_BOARD);
+            
             draw_board(0);
         }
     }
 }
 
-/* --- タスク2: CPU (敵の自動着手) --- */
+/* --- タスク2: CPU (占有を防ぐために sleep/yield を追加) --- */
 void cpu_task() {
-    int pos = 0;
     while (!game_over) {
-        // 簡易的な時間待ち (環境に合わせて調整)
-        for (volatile int d = 0; d < 1000000; d++); 
+        // 長いビジーループの代わりに、OSのタイマー機能があれば sleep を推奨
+        // ない場合は、定期的に yield() を呼び出す
+        for (volatile int d = 0; d < 1000000; d++) {
+            if (d % 1000 == 0) yield(); 
+        }
 
         P(SEM_BOARD);
-        // 空いている場所を探して 'X' を置く
         int placed = 0;
         for (int i = 0; i < 9; i++) {
             if (game_board.cells[i / 3][i % 3] == '.') {
                 game_board.cells[i / 3][i % 3] = 'X';
                 placed = 1;
-                break;
+                break; // 1つ置いたら終了
             }
         }
         V(SEM_BOARD);
+        
         if (placed) draw_board(0);
     }
 }
 
-/* --- タスク3: ボンバー (ランダム消去タスク) --- */
+/* --- タスク3: ボンバー (CPUと実行権を食い合わないように調整) --- */
 void bomber_task() {
     int target = 0;
     while (!game_over) {
-        // CPUより少し遅い周期で巡回
-        for (volatile int d = 0; d < 1500000; d++); 
+        for (volatile int d = 0; d < 1500000; d++) {
+            if (d % 1000 == 0) yield();
+        }
 
         P(SEM_BOARD);
-        // 埋まっているマスを強制的にクリアする
+        // 常に巡回し、'.' 以外なら消去
         if (game_board.cells[target / 3][target % 3] != '.') {
             game_board.cells[target / 3][target % 3] = '.';
         }
