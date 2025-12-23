@@ -2,7 +2,8 @@
 #include <stdarg.h>
 #include "mtk_c.h"
 
-/* --- 外部関数宣言 --- */
+/* --- 外部関数・変数の宣言 --- */
+/* OS側(mtk_asm.o / mtk_c.o)で定義されている関数とセマフォ */
 extern void sw_task(void);
 extern int inkey(int fd);
 
@@ -25,6 +26,7 @@ void draw_board(int fd) {
     char row_buf[32];
 
     P(SEM_UART);
+    /* 画面をクリアしてホームポジションへ移動 */
     my_write(fd, "\033[2J\033[H"); 
     my_write(fd, "=== Survival Tic-Tac-Toe ===\r\n");
     my_write(fd, "YOU: O | CPU: X | BOMB: Clear\r\n\r\n");
@@ -41,17 +43,18 @@ void draw_board(int fd) {
     V(SEM_UART);
 }
 
-/* --- タスク1: プレイヤー --- */
+/* --- タスク1: プレイヤー (UART 0) --- */
 void player_task() {
     while (!game_over) {
         int c = inkey(0);
         
-        // 入力がない、あるいはアセンブラ側の不整合(0)の時はタスクを切り替える
+        /* 入力がない、または不整合(0)の時は sw_task で他タスクにCPUを譲る */
         if (c <= 0) {
             sw_task(); 
             continue;
         }
 
+        /* 1-9 の入力に対応するマスを 'O' にする */
         if (c >= '1' && c <= '9') {
             int pos = c - '1';
             int y = pos / 3;
@@ -69,10 +72,10 @@ void player_task() {
     }
 }
 
-/* --- タスク2: CPU --- */
+/* --- タスク2: CPU (自動着手) --- */
 void cpu_task() {
     while (!game_over) {
-        // CPUの待機時間（sw_taskを挟んで占有を回避）
+        /* CPUの待機（ビジーループ中に sw_task を挟んで他タスクを動かす） */
         for (volatile int d = 0; d < 1000000; d++) {
             if (d % 1000 == 0) sw_task(); 
         }
@@ -91,11 +94,11 @@ void cpu_task() {
     }
 }
 
-/* --- タスク3: ボンバー --- */
+/* --- タスク3: ボンバー (消去) --- */
 void bomber_task() {
     int target = 0;
     while (!game_over) {
-        // ボンバーの待機時間
+        /* CPUより少し遅い周期で巡回 */
         for (volatile int d = 0; d < 1500000; d++) {
             if (d % 1000 == 0) sw_task();
         }
@@ -116,19 +119,25 @@ void bomber_task() {
 /* --- メイン関数 --- */
 int main(void) {
     int i, j;
-    init_kernel();
-    /* セマフォの初期化は init_kernel() 等で実行済みと想定 */
 
+    /* カーネルとハードウェアの初期化 */
+    init_kernel();
+
+    /* 盤面の初期状態を設定 */
     for (i = 0; i < BOARD_SIZE; i++) {
         for (j = 0; j < BOARD_SIZE; j++) {
             game_board.cells[i][j] = '.';
         }
     }
 
+    /* 各タスクをスケジューラに登録 */
     set_task(player_task);
     set_task(cpu_task);
     set_task(bomber_task);
 
+    /* 初期状態を描画してからマルチタスク開始 */
+    draw_board(0);
     begin_sch();
+
     return 0;
 }
