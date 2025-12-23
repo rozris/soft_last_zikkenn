@@ -50,7 +50,7 @@ void player_task() {
         
         /* 入力がない、または不整合(0)の時は sw_task で他タスクにCPUを譲る */
         if (c <= 0) {
-            sw_task(); 
+            //sw_task(); 
             continue;
         }
 
@@ -77,7 +77,7 @@ void cpu_task() {
     while (!game_over) {
         /* CPUの待機（ビジーループ中に sw_task を挟んで他タスクを動かす） */
         for (volatile int d = 0; d < 1000000; d++) {
-            if (d % 1000 == 0) sw_task(); 
+            if (d % 1000 == 0) //sw_task(); 
         }
 
         P(SEM_BOARD);
@@ -100,7 +100,7 @@ void bomber_task() {
     while (!game_over) {
         /* CPUより少し遅い周期で巡回 */
         for (volatile int d = 0; d < 1500000; d++) {
-            if (d % 1000 == 0) sw_task();
+            if (d % 1000 == 0) //sw_task();
         }
 
         P(SEM_BOARD);
