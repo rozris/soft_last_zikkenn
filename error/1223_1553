@@ -1,0 +1,9 @@
+1TE23091G@leecs-cpc028:~/mtk/test3$ make test3
+make  LIB_JIKKEN=~/.local/lib/soft-jikken -f Makefile.3
+make[1]: ディレクトリ '/home/students/23nen/1TE23091G/mtk/test3' に入ります
+LANG=C LC_ALL=C m68k-elf-gcc -c -g -O2 -Wall -fomit-frame-pointer -m68000 -msoft-float -I.  -Wa,-ahls=test3.glis -o test3.o test3.c
+test3.c: In function 'cpu_task':
+--- Board (1-9 to move) ---ed variable 'pos' [-Wunused-variable]
+. . . |     int pos = 0;
+MC68VZ328 Board IPL Program by Humblesoft.
+Ver. 1.03-02 2019/01/23(Wed) (230400bps, 33MHz).0.o mon.o csys68k.o inchrw.o mtkwaiting for S-filechr.o test3.o -o test3.hex -Map test3.map -L/usr/local/m68k-elf/lib -L/usr/local/lib/gcc/m68k-elf/11 -T ~/.local/lib/soft-jikken/ldscript.cmd
