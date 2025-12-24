@@ -195,10 +195,9 @@ void cpu_task() {
 void bomber_task() {
     int target = 0;
     while (!game_over) {
-        for (volatile int d = 0; d < 1200000; d++); 
+        for (volatile int d = 0; d < 400000; d++); 
         
         P(SEM_BOARD);
-        // 【重要】ウェイト中にゲームが終了していたら、破壊処理をせずに即座に抜ける
         if (game_over) {
             V(SEM_BOARD);
             break; 
@@ -214,12 +213,12 @@ void bomber_task() {
                 if (is_valid(ny, nx)) game_board.cells[ny][nx] = '.';
             }
             V(SEM_BOARD);
-            draw_board(0, "!!! CROSS BOMB EXPLODED !!!");
+            draw_board(0, "!!! CROSS BOMB!!!!!!!!! ");
         } else {
             if (game_board.cells[ty][tx] != '.') {
                 game_board.cells[ty][tx] = '.';
                 V(SEM_BOARD);
-                draw_board(0, "Bomb ticking...");
+                draw_board(0, "Bomb!!!!!!!!!!");
             } else { V(SEM_BOARD); }
         }
         target = (target + 1 + (my_rand() % 3)) % 25;
