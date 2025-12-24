@@ -16,10 +16,10 @@ typedef struct {
 BOARD_DATA game_board;
 int game_over = 0;
 
-/* --- 勝敗判定 (5つ並んだかチェック) --- */
+//勝敗判定部分
 char check_winner() {
     int i, j;
-    // 横の判定
+    //横の判定
     for (i = 0; i < BOARD_SIZE; i++) {
         if (game_board.cells[i][0] != '.' &&
             game_board.cells[i][0] == game_board.cells[i][1] &&
@@ -27,7 +27,7 @@ char check_winner() {
             game_board.cells[i][2] == game_board.cells[i][3] &&
             game_board.cells[i][3] == game_board.cells[i][4]) return game_board.cells[i][0];
     }
-    // 縦の判定
+    //縦の判定
     for (j = 0; j < BOARD_SIZE; j++) {
         if (game_board.cells[0][j] != '.' &&
             game_board.cells[0][j] == game_board.cells[1][j] &&
@@ -35,7 +35,7 @@ char check_winner() {
             game_board.cells[2][j] == game_board.cells[3][j] &&
             game_board.cells[3][j] == game_board.cells[4][j]) return game_board.cells[0][j];
     }
-    // 斜めの判定
+    //斜めの判定
     if (game_board.cells[2][2] != '.') {
         if (game_board.cells[0][0] == game_board.cells[1][1] && game_board.cells[1][1] == game_board.cells[2][2] &&
             game_board.cells[2][2] == game_board.cells[3][3] && game_board.cells[3][3] == game_board.cells[4][4]) return game_board.cells[2][2];
