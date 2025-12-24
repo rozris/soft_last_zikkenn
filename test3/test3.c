@@ -72,8 +72,20 @@ void draw_board(int fd, char* msg) {
     winner = check_winner();
     if (winner != 0) {
         game_over = 1;
-        if (winner == 'O') my_write(fd, "\r\n [!] ***** YOU WIN! *****\r\n");
-        else if (winner == 'X') my_write(fd, "\r\n [!] ***** CPU WIN! *****\r\n");
+        if (winner == 'O') my_write(fd, "\r\n [!] YOU!!!!!!!!!!!!!!1 WIN!!!!!!!!!!!!!!\r\n");
+        else if (winner == 'X'){
+            my_write(fd, "\r\n [!] G☆A☆M☆E☆O☆V☆E☆R\r\n");
+            my_write(fd,"....................../´¯/)\n");
+            my_write(fd,"....................,/¯../\n");
+            my_write(fd,".................../..../\n");
+            my_write(fd,"............./´¯'...'/´¯¯`·¸\n");
+            my_write(fd,"........../'/.../..../......./¨¯\\\n");
+            my_write(fd,"........('(...'...'.... ¯~/'...')\n");
+            my_write(fd,".........\\.................'...../\n");
+            my_write(fd,"..........''...\\.......... _.·´\n");
+            my_write(fd,"............\\..............(\n");
+            my_write(fd,"..............\\.............\\...\n");
+        }
         else my_write(fd, "\r\n [!] ***** DRAW GAME *****\r\n");
     } else {
         my_write(fd, "\r\n ");
@@ -82,7 +94,58 @@ void draw_board(int fd, char* msg) {
     V(SEM_UART);
 }
 
-/* --- プレイヤー：座標入力タスク --- */
+
+
+
+//CPU補助関数群
+int is_valid(int y, int x) {
+    return (y >= 0 && y < BOARD_SIZE && x >= 0 && x < BOARD_SIZE);
+}
+
+/*count_continuous
+連続数をカウントする関数
+(y, x) から方向 (dy, dx) へ進みながら mark がいくつ並んでいるか返す
+*/
+
+int count_continuous(int y, int x, int dy, int dx, char mark) {
+    int count = 0;
+    while (is_valid(y, x) && game_board.cells[y][x] == mark) {
+        count++;
+        y += dy;
+        x += dx;
+    }
+    return count;
+}
+
+/*get_end_position
+  指定した長さの連なりを探し、その両端の空きマスを見つける関数
+  返り値: 見つかれば1(座標を*ry, *rxに格納)、なければ0
+ */
+int get_end_position(int length, char mark, int *ry, int *rx) {
+    int y, x, i;
+    // 8方向のベクトル (右, 下, 右下, 左下, およびその逆方向)
+    int dy[] = {0, 1, 1, 1, 0, -1, -1, -1};
+    int dx[] = {1, 0, 1, -1, -1, 0, -1, 1};
+
+    for (y = 0; y < BOARD_SIZE; y++) {
+        for (x = 0; x < BOARD_SIZE; x++) {
+            // 起点が調べたいマークである必要はない（空きマスから連なりをチェックするため）
+            if (game_board.cells[y][x] != '.') continue;
+
+            for (i = 0; i < 8; i++) {
+                // 空きマス (y, x) の隣から、指定方向に mark が何個並んでいるか
+                if (count_continuous(y + dy[i], x + dx[i], dy[i], dx[i], mark) == length) {
+                    *ry = y;
+                    *rx = x;
+                    return 1; // ターゲット発見
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+//プレイヤータスク、座標入力
 void player_task() {
     int y = -1, x = -1;
     char prompt[64] = "Input Row (1-5): ";
@@ -102,7 +165,8 @@ void player_task() {
                     game_board.cells[y][x] = 'O';
                     sprintf(prompt, "Placed at (%d, %d). Next Row (1-5): ", y+1, x+1);
                     y = -1; x = -1;
-                } else {
+                } 
+                else {
                     sprintf(prompt, "Occupied! Select Row (1-5) again: ");
                     y = -1; x = -1;
                 }
@@ -111,28 +175,69 @@ void player_task() {
             draw_board(0, prompt);
         }
     }
-}
-
-/* --- CPU：着手タスク --- */
-void cpu_task() {
-    while (!game_over) {
-        for (volatile int d = 0; d < 800000; d++); 
-
-        P(SEM_BOARD);
-        int placed = 0;
-        for (int i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
-            if (game_board.cells[i/BOARD_SIZE][i%BOARD_SIZE] == '.') {
-                game_board.cells[i/BOARD_SIZE][i%BOARD_SIZE] = 'X';
-                placed = 1;
-                break;
-            }
-        }
-        V(SEM_BOARD);
-        if (placed) draw_board(0, "CPU moved.");
+    while(game_over) {
+        for (volatile int d = 0; d < 1800000; d++);
     }
 }
 
-/* --- ボンバー：消去タスク --- */
+//CPU基本タスク
+void cpu_task() {
+    int ty, tx;
+    while (!game_over) {
+        //CPUの思考時間（難易度調整用）
+        for (volatile int d = 0; d < 800000; d++); 
+
+        int placed = 0;
+        P(SEM_BOARD);
+
+        /*動作ロジック*/
+        
+        //CPUが4つ並んでいる->5つ目をおいて勝利確定
+        if (get_end_position(4, 'X', &ty, &tx)) placed = 1;
+        
+        //プレイヤーが4つ並んでいる->阻止
+        else if (get_end_position(4, 'O', &ty, &tx)) placed = 1;
+        
+        //CPUが3つ並んでいる->両端を伸ばす
+        else if (get_end_position(3, 'X', &ty, &tx)) placed = 1;
+        
+        //プレイヤーが3つ並んでいる->阻止
+        else if (get_end_position(3, 'O', &ty, &tx)) placed = 1;
+        
+        //CPUが2つ並んでいる->伸ばす
+        else if (get_end_position(2, 'X', &ty, &tx)) placed = 1;
+        
+        //CPUのマークの隣に置く（1つ並んでいる場合）
+        else if (get_end_position(1, 'X', &ty, &tx)) placed = 1;
+        
+        //条件に合う場所がなければ空いている場所を探す
+        else {
+            for (int i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
+                if (game_board.cells[i / BOARD_SIZE][i % BOARD_SIZE] == '.') {
+                    ty = i / BOARD_SIZE;
+                    tx = i % BOARD_SIZE;
+                    placed = 1;
+                    break;
+                }
+            }
+        }
+
+        if (placed && !game_over) {
+            game_board.cells[ty][tx] = 'X';
+            V(SEM_BOARD);
+            draw_board(0, "CPU moved strategically!");
+        } else {
+            V(SEM_BOARD);
+        }
+    }
+
+    // ゲーム終了後の無限ループ
+    while (game_over) {
+        for (volatile int d = 0; d < 1800000; d++);
+    }
+}
+
+//爆弾タスク
 void bomber_task() {
     int target = 0;
     while (!game_over) {
@@ -142,11 +247,14 @@ void bomber_task() {
         if (game_board.cells[target/BOARD_SIZE][target%BOARD_SIZE] != '.') {
             game_board.cells[target/BOARD_SIZE][target%BOARD_SIZE] = '.';
             V(SEM_BOARD);
-            draw_board(0, "Bomb ticking...");
+            draw_board(0, "Bomb!! Cell cleared!!!!!!!!!!!");
         } else {
             V(SEM_BOARD);
         }
         target = (target + 1) % (BOARD_SIZE * BOARD_SIZE);
+    }
+    while(game_over) {
+        for (volatile int d = 0; d < 1800000; d++);
     }
 }
 
