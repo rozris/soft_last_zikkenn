@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include "mtk_c.h"
-
-/* --- 外部関数の宣言 --- */
 extern int inkey(int fd);
 
 #define BOARD_SIZE 5
