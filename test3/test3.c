@@ -16,7 +16,7 @@ typedef struct {
 BOARD_DATA game_board;
 int game_over = 0;
 
-/* --- 簡易乱数生成器 (線形合同法) --- */
+/* --- 簡易乱数生成器 --- */
 static unsigned long seed = 12345;
 int my_rand() {
     seed = seed * 1103515245 + 12345;
@@ -38,10 +38,6 @@ int count_continuous(int y, int x, int dy, int dx, char mark) {
     return count;
 }
 
-/* * 指定した長さの連なりを探し、その端の空きマスを「ランダム」に1つ選ぶ 
- * CPUのランダム性強化のため、候補をスキャンして最初に見つかったものではなく、
- * 乱数で選ばれた候補を返します。
- */
 int get_strategic_move(int length, char mark, int *ry, int *rx) {
     int y, x, i;
     int dy[] = {0, 1, 1, 1, 0, -1, -1, -1};
@@ -62,7 +58,6 @@ int get_strategic_move(int length, char mark, int *ry, int *rx) {
             }
         }
     }
-
     if (count > 0) {
         int target = my_rand() % count;
         *ry = candidates_y[target];
@@ -72,7 +67,7 @@ int get_strategic_move(int length, char mark, int *ry, int *rx) {
     return 0;
 }
 
-/* --- 勝敗判定部分 --- */
+/* --- 勝敗判定 --- */
 char check_winner() {
     int i, j;
     for (i = 0; i < BOARD_SIZE; i++) {
@@ -95,8 +90,7 @@ char check_winner() {
         if (game_board.cells[0][4] == game_board.cells[1][3] && game_board.cells[1][3] == game_board.cells[2][2] &&
             game_board.cells[2][2] == game_board.cells[3][1] && game_board.cells[3][1] == game_board.cells[4][0]) return game_board.cells[2][2];
     }
-    for (i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) 
-        if (game_board.cells[i/BOARD_SIZE][i%BOARD_SIZE] == '.') return 0;
+    for (i = 0; i < 25; i++) if (game_board.cells[i/5][i%5] == '.') return 0;
     return 'D';
 }
 
@@ -109,9 +103,7 @@ void draw_board(int fd, char* msg) {
     P(SEM_UART);
     my_write(fd, "\033[2J\033[H"); 
     my_write(fd, "=== Survival Tic-Tac-Toe (5x5) ===\r\n");
-    my_write(fd, "YOU: O | CPU: X | BOMB: Clear\r\n\r\n");
-    my_write(fd, "      1   2   3   4   5\r\n");
-    my_write(fd, "    +---+---+---+---+---+\r\n");
+    my_write(fd, "YOU: O | CPU: X | BOMB: Clear\r\n\r\n      1   2   3   4   5\r\n    +---+---+---+---+---+\r\n");
 
     for (i = 0; i < BOARD_SIZE; i++) {
         sprintf(row_buf, "  %d | %c | %c | %c | %c | %c |\r\n", i + 1,
@@ -124,24 +116,14 @@ void draw_board(int fd, char* msg) {
     winner = check_winner();
     if (winner != 0) {
         game_over = 1;
-        if (winner == 'O') my_write(fd, "\r\n [!] YOU!!!!!!!!!!!!!!1 WIN!!!!!!!!!!!!!!\r\n");
+        if (winner == 'O') my_write(fd, "\r\n [!] YOU WIN!\r\n");
         else if (winner == 'X'){
             my_write(fd, "\r\n [!] G☆A☆M☆E☆O☆V☆E☆R\r\n");
-            my_write(fd,"....................../´¯/)\n");
-            my_write(fd,"....................,/¯../\n");
-            my_write(fd,".................../..../\n");
-            my_write(fd,"............./´¯'...'/´¯¯`·¸\n");
-            my_write(fd,"........../'/.../..../......./¨¯\\\n");
-            my_write(fd,"........('(...'...'.... ¯~/'...')\n");
-            my_write(fd,".........\\.................'...../\n");
-            my_write(fd,"..........''...\\.......... _.·´\n");
-            my_write(fd,"............\\..............(\n");
-            my_write(fd,"..............\\.............\\...\n");
+            my_write(fd,"....................../´¯/)\n....................,/¯../\n.................../..../\n............./´¯'...'/´¯¯`·¸\n........../'/.../..../......./¨¯\\\n........('(...'...'.... ¯~/'...')\n.........\\.................'...../\n..........''...\\.......... _.·´\n............\\..............(\n..............\\.............\\...\n");
         }
         else my_write(fd, "\r\n [!] ***** DRAW GAME *****\r\n");
     } else {
-        my_write(fd, "\r\n ");
-        my_write(fd, msg);
+        my_write(fd, "\r\n "); my_write(fd, msg);
     }
     V(SEM_UART);
 }
@@ -150,29 +132,22 @@ void draw_board(int fd, char* msg) {
 void player_task() {
     int y = -1, x = -1;
     char prompt[64] = "Input Row (1-5): ";
-    
     while (!game_over) {
         int c = inkey(0);
         if (c <= 0 || c == 10 || c == 13) continue;
-
-        // キー入力のタイミングで乱数シードを変化させる
         seed += c;
-
         if (c >= '1' && c <= '5') {
-            if (y == -1) {
-                y = c - '1';
-                sprintf(prompt, "Row %d selected. Input Col (1-5): ", y + 1);
-            } else {
+            if (y == -1) { y = c - '1'; sprintf(prompt, "Row %d selected. Input Col (1-5): ", y + 1); }
+            else {
                 x = c - '1';
                 P(SEM_BOARD);
-                if (game_board.cells[y][x] == '.') {
-                    game_board.cells[y][x] = 'O';
-                    sprintf(prompt, "Placed at (%d, %d). Next Row (1-5): ", y+1, x+1);
-                    y = -1; x = -1;
-                } else {
-                    sprintf(prompt, "Occupied! Select Row (1-5) again: ");
-                    y = -1; x = -1;
+                if (!game_over) { // セマフォ取得後にチェック
+                    if (game_board.cells[y][x] == '.') {
+                        game_board.cells[y][x] = 'O';
+                        sprintf(prompt, "Placed at (%d, %d). Next Row: ", y+1, x+1);
+                    } else { sprintf(prompt, "Occupied! Select Row again: "); }
                 }
+                y = -1; x = -1;
                 V(SEM_BOARD);
             }
             draw_board(0, prompt);
@@ -181,16 +156,16 @@ void player_task() {
     while(game_over) { for (volatile int d = 0; d < 1800000; d++); }
 }
 
-/* --- CPUタスク (ランダム性強化版) --- */
+/* --- CPUタスク --- */
 void cpu_task() {
     int ty, tx;
     while (!game_over) {
         for (volatile int d = 0; d < 200000; d++); 
+        
+        P(SEM_BOARD);
+        if (game_over) { V(SEM_BOARD); break; } // バグ防止：ウェイト中に終了していたら抜ける
 
         int placed = 0;
-        P(SEM_BOARD);
-
-        // 戦略的着手 (get_strategic_moveが候補からランダムに選ぶ)
         if (get_strategic_move(4, 'X', &ty, &tx)) placed = 1;
         else if (get_strategic_move(4, 'O', &ty, &tx)) placed = 1;
         else if (get_strategic_move(3, 'X', &ty, &tx)) placed = 1;
@@ -198,14 +173,10 @@ void cpu_task() {
         else if (get_strategic_move(2, 'X', &ty, &tx)) placed = 1;
         else if (get_strategic_move(1, 'X', &ty, &tx)) placed = 1;
         else {
-            // 完全ランダムな空きマス探し
             int start = my_rand() % 25;
             for (int i = 0; i < 25; i++) {
                 int idx = (start + i) % 25;
-                if (game_board.cells[idx / 5][idx % 5] == '.') {
-                    ty = idx / 5; tx = idx % 5;
-                    placed = 1; break;
-                }
+                if (game_board.cells[idx / 5][idx % 5] == '.') { ty = idx / 5; tx = idx % 5; placed = 1; break; }
             }
         }
 
@@ -220,39 +191,37 @@ void cpu_task() {
     while (game_over) { for (volatile int d = 0; d < 1800000; d++); }
 }
 
-/* --- 爆弾タスク (20%十字破壊版) --- */
+/* --- 爆弾タスク（バグ修正版） --- */
 void bomber_task() {
     int target = 0;
     while (!game_over) {
         for (volatile int d = 0; d < 1200000; d++); 
         
         P(SEM_BOARD);
+        // 【重要】ウェイト中にゲームが終了していたら、破壊処理をせずに即座に抜ける
+        if (game_over) {
+            V(SEM_BOARD);
+            break; 
+        }
+
         int ty = target / BOARD_SIZE;
         int tx = target % BOARD_SIZE;
 
-        // 20%の確率で十字破壊
         if (my_rand() % 100 < 20) {
-            int dy[] = {0, 0, 1, -1, 0}; // 中心, 右, 下, 左, 上
-            int dx[] = {0, 1, 0, 0, -1};
+            int dy[] = {0, 0, 1, -1, 0}, dx[] = {0, 1, 0, 0, -1};
             for (int i = 0; i < 5; i++) {
-                int ny = ty + dy[i];
-                int nx = tx + dx[i];
+                int ny = ty + dy[i], nx = tx + dx[i];
                 if (is_valid(ny, nx)) game_board.cells[ny][nx] = '.';
             }
             V(SEM_BOARD);
             draw_board(0, "!!! CROSS BOMB EXPLODED !!!");
         } else {
-            // 通常破壊
             if (game_board.cells[ty][tx] != '.') {
                 game_board.cells[ty][tx] = '.';
                 V(SEM_BOARD);
-                draw_board(0, "Bomb!! Cell cleared!!!!!!!!!!!");
-            } else {
-                V(SEM_BOARD);
-            }
+                draw_board(0, "Bomb ticking...");
+            } else { V(SEM_BOARD); }
         }
-        
-        // 次の爆弾ターゲットはランダムまたは巡回 (ここではランダム性を追加)
         target = (target + 1 + (my_rand() % 3)) % 25;
     }
     while(game_over) { for (volatile int d = 0; d < 1800000; d++); }
@@ -261,13 +230,8 @@ void bomber_task() {
 int main(void) {
     int i, j;
     init_kernel();
-    for (i = 0; i < BOARD_SIZE; i++)
-        for (j = 0; j < BOARD_SIZE; j++) game_board.cells[i][j] = '.';
-
-    set_task(player_task);
-    set_task(cpu_task);
-    set_task(bomber_task);
-
+    for (i = 0; i < BOARD_SIZE; i++) for (j = 0; j < BOARD_SIZE; j++) game_board.cells[i][j] = '.';
+    set_task(player_task); set_task(cpu_task); set_task(bomber_task);
     draw_board(0, "Ready? Input Row (1-5): ");
     begin_sch();
     return 0;
