@@ -72,9 +72,9 @@ void draw_board(int fd, char* msg) {
     winner = check_winner();
     if (winner != 0) {
         game_over = 1;
-        if (winner == 'O') my_write(fd, "\r\n [!] YOU!!!!!!!!!!!!!!1 WIN!!!!!!!!!!!!!!\r\n");
+        if (winner == 'O') my_write(fd, "\r\n YOU!!!!!!!!!!!!!! WIN!!!!!!!!!!!!!!\r\n");
         else if (winner == 'X'){
-            my_write(fd, "\r\n [!] G☆A☆M☆E☆O☆V☆E☆R\r\n");
+            my_write(fd, "\r\n G A M E O V E R\r\n");
             my_write(fd,"....................../´¯/)\n");
             my_write(fd,"....................,/¯../\n");
             my_write(fd,".................../..../\n");
@@ -185,7 +185,7 @@ void cpu_task() {
     int ty, tx;
     while (!game_over) {
         //CPUの思考時間（難易度調整用）
-        for (volatile int d = 0; d < 800000; d++); 
+        for (volatile int d = 0; d < 200000; d++); 
 
         int placed = 0;
         P(SEM_BOARD);
@@ -241,7 +241,7 @@ void cpu_task() {
 void bomber_task() {
     int target = 0;
     while (!game_over) {
-        for (volatile int d = 0; d < 1800000; d++); 
+        for (volatile int d = 0; d < 1200000; d++); 
         
         P(SEM_BOARD);
         if (game_board.cells[target/BOARD_SIZE][target%BOARD_SIZE] != '.') {
