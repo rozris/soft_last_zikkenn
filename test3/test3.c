@@ -56,7 +56,7 @@ void draw_board(int fd, char* msg) {
 
     P(SEM_UART);
     my_write(fd, "\033[2J\033[H"); 
-    my_write(fd, "=== Survival Tic-Tac-Toe (5x5) ===\r\n");
+    my_write(fd, "=== 五目並べ ===\r\n");
     my_write(fd, "YOU: O | CPU: X | BOMB: Clear\r\n\r\n");
     my_write(fd, "      1   2   3   4   5\r\n");
     my_write(fd, "    +---+---+---+---+---+\r\n");
@@ -86,7 +86,7 @@ void draw_board(int fd, char* msg) {
             my_write(fd,"............\\..............(\n");
             my_write(fd,"..............\\.............\\...\n");
         }
-        else my_write(fd, "\r\n [!] ***** DRAW GAME *****\r\n");
+        else my_write(fd, "\r\n***** DRAW GAME *****\r\n");
     } else {
         my_write(fd, "\r\n ");
         my_write(fd, msg);
@@ -137,7 +137,7 @@ int get_end_position(int length, char mark, int *ry, int *rx) {
                 if (count_continuous(y + dy[i], x + dx[i], dy[i], dx[i], mark) == length) {
                     *ry = y;
                     *rx = x;
-                    return 1; // ターゲット発見
+                    return 1; //ターゲット発見
                 }
             }
         }
