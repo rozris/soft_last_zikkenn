@@ -175,14 +175,24 @@ void player_task() {
     }
 }
 
+//CPUタスク (思考時間のランダム化実装)
 void cpu_task() {
     int ty, tx;
+    const int BASE_WAIT = 125000; // 約0.5秒相当のベースウェイト
+    
     while (1) {
-        if (game_over){ for (volatile int d = 0; d < 200000; d++); continue; }
-        for(volatile int d = 0; d < 250000; d++); 
+        if (game_over) { for (volatile int d = 0; d < 200000; d++); continue; }
+        
+        // --- 思考時間のランダム化 (0.5秒〜1.5秒相当) ---
+        // BASE_WAIT + (0〜250000) の範囲でウェイトを決定
+        int random_wait = BASE_WAIT + (my_rand() % 250000);
+        for (volatile int d = 0; d < random_wait; d++); 
+
         P(SEM_BOARD);
         if (game_over) { V(SEM_BOARD); continue; }
+        
         int placed = 0;
+        // 優先度に基づいた戦略的思考
         if (get_strategic_move(4, 'X', &ty, &tx)) placed = 1;
         else if (get_strategic_move(4, 'O', &ty, &tx)) placed = 1;
         else if (get_strategic_move(3, 'X', &ty, &tx)) placed = 1;
@@ -193,14 +203,17 @@ void cpu_task() {
             int start = my_rand() % 25;
             for (int i = 0; i < 25; i++) {
                 int idx = (start + i) % 25;
-                if (game_board.cells[idx / 5][idx % 5] == '.') { ty = idx / 5; tx = idx % 5; placed = 1; break; }
+                if (game_board.cells[idx / 5][idx % 5] == '.') { 
+                    ty = idx / 5; tx = idx % 5; placed = 1; break; 
+                }
             }
         }
-        if(placed && !game_over) { 
+        
+        if (placed && !game_over) { 
             game_board.cells[ty][tx] = 'X'; 
             update_cell(ty, tx, 'X');
             check_and_announce(0);
-            if(!game_over) update_msg("CPU moved.");
+            if (!game_over) update_msg("CPU moved.");
         }
         V(SEM_BOARD);
     }
