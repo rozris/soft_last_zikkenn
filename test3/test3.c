@@ -217,42 +217,32 @@ void bomber_task() {
     }
 }
 
-//リトライタスク
+/* --- タスク4: リトライ監視タスク (リファイン版) --- */
 void retry_task() {
-    char debug_msg[64];
     while (1) {
-        // キー入力をチェック
         int c = inkey(0);
-        
-        if (c > 0) {
-            // 何か入力されたら即座にUARTセマフォを取って表示
-            P(SEM_UART);
-            sprintf(debug_msg, "\r\n >>> [DEBUG] Key Pressed: '%c' (code:%d) <<<\r\n", (c >= 32 ? c : '?'), c);
-            my_write(0, debug_msg);
-            V(SEM_UART);
-
-            // ゲーム終了状態なら判定
-            if (game_over) {
-                if (c == 'y' || c == 'Y') {
-                    P(SEM_UART); my_write(0, ">>> RESETTING... <<<\r\n"); V(SEM_UART);
-                    P(SEM_BOARD);
-                    init_game_state();
-                    V(SEM_BOARD);
-                    draw_board(0, "Reset Complete.");
-                } 
-                else if (c == 'n' || c == 'N') {
-                    P(SEM_UART);
-                    my_write(0, "\033[2J\033[H\r\n [!] PRESSED N: STOPPING ALL TASKS.\r\n");
-                    V(SEM_UART);
-                    game_over = 1; // 念のため
-                    P(SEM_BOARD); // 全ロジック停止
-                    while(1);
-                }
+        if (game_over && c > 0) {
+            if (c == 'y' || c == 'Y') {
+                P(SEM_BOARD);
+                init_game_state();
+                V(SEM_BOARD);
+                draw_board(0, "Reset Complete. Input Row (1-5): ");
+            } 
+            else if (c == 'n' || c == 'N') {
+                P(SEM_UART);
+                my_write(0, "\033[2J\033[H\r\n [!] SHUTTING DOWN...\r\n");
+                V(SEM_UART);
+                P(SEM_BOARD); 
+                while(1); 
             }
         }
         
-        // 監視速度と負荷のバランス
-        for (volatile int d = 0; d < 50000; d++);
+        // 待機間隔の最適化：game_over中は高速スキャン
+        if (game_over) {
+            for (volatile int d = 0; d < 50000; d++);
+        } else {
+            for (volatile int d = 0; d < 200000; d++);
+        }
     }
 }
 
