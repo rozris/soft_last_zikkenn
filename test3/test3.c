@@ -228,7 +228,7 @@ void bomber_task() {
 void retry_task() {
     while (1) {
         int c = inkey(0);
-        if (game_over && c > 0) {
+        if (game_over && c > 0) {   
             if (c == 'y' || c == 'Y') {
                 P(SEM_BOARD);
                 is_hard_mode = (c == 'Y');
