@@ -219,37 +219,40 @@ void bomber_task() {
 
 //リトライタスク
 void retry_task() {
+    char debug_msg[64];
     while (1) {
-        // game_overになるまで待機
-        while (!game_over) {
-            for (volatile int d = 0; d < 200000; d++); 
-        }
-
-        // ゲームが決着したら、inbyteで入力を待つ
-        // inbyteは入力があるまでこのタスクを停止させるため、他タスクを邪魔しません
-        int c = inbyte(0);
-
-        if (c == 'y' || c == 'Y') {
-            // ロジックと描画を止めるためにセマフォを取得
-            P(SEM_BOARD);
+        // キー入力をチェック
+        int c = inkey(0);
+        
+        if (c > 0) {
+            // 何か入力されたら即座にUARTセマフォを取って表示
             P(SEM_UART);
-            
-            init_game_state();
-            draw_board(0, "Game Reset! Row (1-5): ");
-            
+            sprintf(debug_msg, "\r\n >>> [DEBUG] Key Pressed: '%c' (code:%d) <<<\r\n", (c >= 32 ? c : '?'), c);
+            my_write(0, debug_msg);
             V(SEM_UART);
-            V(SEM_BOARD);
-        } 
-        else if (c == 'n' || c == 'N') {
-            P(SEM_UART);
-            my_write(0, "\033[2J\033[H"); 
-            my_write(0, "\r\n PRESSED N: SHUTTING DOWN...\r\n");
-            V(SEM_UART);
-            
-            // 全てのセマフォを確保して他タスクを停止させ、自分も停止
-            P(SEM_BOARD);
-            while(1); 
+
+            // ゲーム終了状態なら判定
+            if (game_over) {
+                if (c == 'y' || c == 'Y') {
+                    P(SEM_UART); my_write(0, ">>> RESETTING... <<<\r\n"); V(SEM_UART);
+                    P(SEM_BOARD);
+                    init_game_state();
+                    V(SEM_BOARD);
+                    draw_board(0, "Reset Complete.");
+                } 
+                else if (c == 'n' || c == 'N') {
+                    P(SEM_UART);
+                    my_write(0, "\033[2J\033[H\r\n [!] PRESSED N: STOPPING ALL TASKS.\r\n");
+                    V(SEM_UART);
+                    game_over = 1; // 念のため
+                    P(SEM_BOARD); // 全ロジック停止
+                    while(1);
+                }
+            }
         }
+        
+        // 監視速度と負荷のバランス
+        for (volatile int d = 0; d < 50000; d++);
     }
 }
 
