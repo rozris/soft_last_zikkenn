@@ -99,7 +99,7 @@ void update_cell(int y, int x, char mark) {
      * "  1 | . |" の構成なら、最初の '.' は 9列目。
      * その後 4文字おき (| . |) なので 9, 13, 17, 21, 25列目となる。
      */
-    sprintf(buf, "\033[%d;%dH%c", 7 + y * 2, 9 + x * 4, mark);
+    sprintf(buf, "\033[%d;%dH%c", 7 + y * 2, 8 + x * 4, mark);
     my_write(0, buf);
     
     // カーソルを入力待ちの邪魔にならない位置（画面最下部）へ移動
