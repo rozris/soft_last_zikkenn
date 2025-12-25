@@ -77,7 +77,7 @@ char check_winner() {
 
 void update_cell(int y, int x, char mark) {
     char buf[16];
-    sprintf(buf, "\033[%d;%dH%c", 7 + y * 2, 9 + x * 4, mark);
+    sprintf(buf, "\033[%d;%dH%c", 7 + y * 2, 7 + x * 4, mark);
     P(SEM_UART);
     my_write(0, buf);
     my_write(0, "\033[22;1H"); 
