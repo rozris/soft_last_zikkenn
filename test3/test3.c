@@ -88,43 +88,64 @@ void init_game_state() {
         for (j=0;j<BOARD_SIZE;j++)game_board.cells[i][j]='.';
 }
 
-/* --- 高速描画用：指定マスの更新 --- */
+/* --- 高速描画用：指定マスの更新 (座標を微調整) --- */
 void update_cell(int y, int x, char mark) {
     char buf[32];
     P(SEM_UART);
-    // 枠組みに基づいた座標計算: 行 = 7 + y*2, 列 = 10 + x*4
-    sprintf(buf, "\033[%d;%dH%c", 7 + y * 2, 10 + x * 4, mark);
+    // 写真2のレイアウトに基づく座標計算
+    // 行(Vertical): 7行目から1行おき (7, 9, 11, 13, 15)
+    // 列(Horizontal): 8列目から4文字おき (8, 12, 16, 20, 24)
+    // 形式: \033[行;列H
+    sprintf(buf, "\033[%d;%dH%c", 7 + y * 2, 8 + x * 4, mark);
     my_write(0, buf);
-    // カーソルをメッセージ行の先頭へ戻しておく
-    my_write(0, "\033[18;1H");
+    
+    // 入力時にカーソルが邪魔にならないよう、常にメッセージ行の下へ逃がす
+    my_write(0, "\033[20;1H"); 
     V(SEM_UART);
 }
 
 /* --- 高速描画用：メッセージのみ更新 --- */
 void update_msg(char* msg) {
     P(SEM_UART);
-    my_write(0, "\033[18;1H\033[K "); // 18行目に移動し、行末まで消去
+    // 18行目に移動し、行全体をクリアしてから書き込む
+    // \033[2K は行全体消去、\033[G は行頭復帰
+    my_write(0, "\033[18;1H\033[2K "); 
     my_write(0, msg);
+    // カーソルを隠す設定（対応している端末のみ）
+    my_write(0, "\033[?25l");
     V(SEM_UART);
 }
 
-/* --- 初期画面描画（固定部分を一度に書く） --- */
+/* --- 初期画面描画（この枠組みを基準にします） --- */
 void draw_board(int fd, char* msg) {
     int i;
     P(SEM_UART);
+    // 画面全体消去とカーソルホーム
     my_write(fd, "\033[2J\033[H"); 
-    my_write(fd, "五目並べの達人\r\nプレイヤー: O | CPU: X | 爆弾:定期的に盤面を破壊します \r\n");
-    my_write(fd, "マスは早い者勝ちです、列・行の順に指定してください\r\n");
-    my_write(fd, "\r\n       1   2   3   4   5\r\n    +---+---+---+---+---+\r\n");
+    my_write(fd, "五目並べの達人\r\n");
+    my_write(fd, "プレイヤー: O | CPU: X | 爆弾: 定期的に盤面を破壊します\r\n");
+    my_write(fd, "マスは早い者勝ちです。列・行の順に指定してください\r\n\r\n");
+    my_write(fd, "       1   2   3   4   5\r\n");
+    my_write(fd, "    +---+---+---+---+---+\r\n");
+    
     for (i = 0; i < BOARD_SIZE; i++) {
-        char row[64];
-        sprintf(row, "  %d | %c | %c | %c | %c | %c |\r\n", i + 1, game_board.cells[i][0], game_board.cells[i][1], game_board.cells[i][2], game_board.cells[i][3], game_board.cells[i][4]);
-        my_write(fd, row);
+        // 各マスの初期状態（.）を描画。ここが update_cell の上書き対象になります
+        my_write(fd, "  %d | . | . | . | . | . |\r\n", i + 1);
         my_write(fd, "    +---+---+---+---+---+\r\n");
     }
+    
     my_write(fd, "\r\n ");
     my_write(fd, msg);
     V(SEM_UART);
+    
+    // すでに石がある場合は初期描画後に上書き（リトライ時用）
+    for (int ty = 0; ty < BOARD_SIZE; ty++) {
+        for (int tx = 0; tx < BOARD_SIZE; tx++) {
+            if (game_board.cells[ty][tx] != '.') {
+                update_cell(ty, tx, game_board.cells[ty][tx]);
+            }
+        }
+    }
 }
 
 //終了判定と通知
