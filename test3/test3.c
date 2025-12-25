@@ -103,7 +103,7 @@ void draw_board(int fd, char* msg) {
     winner=check_winner();
     if (winner != 0) {
         game_over = 1;
-        if (winner == 'O') my_write(fd, "\r\n [!] YOU WIN!\r\n");
+        if (winner == 'O') my_write(fd, "\r\nYOU WIN!\r\n");
         else if (winner == 'X'){
             my_write(fd, "\r\n G A M E O V E R\r\n");
             my_write(fd,"....................../´¯/)\n");
@@ -117,8 +117,8 @@ void draw_board(int fd, char* msg) {
             my_write(fd,"............\\..............(\n");
             my_write(fd,"..............\\.............\\...\n");
         }        
-        else my_write(fd, "\r\n [!] ***** DRAW GAME *****\r\n");
-        my_write(fd,"\r\n Retry? (Y/N): ");
+        else my_write(fd, "\r\n DRAW-GAME\r\n");
+        my_write(fd,"\r\n ritry? (Y/N): ");
     } 
     else{
         my_write(fd, "\r\n "); my_write(fd, msg);
@@ -130,7 +130,10 @@ void draw_board(int fd, char* msg) {
 void player_task() {
     int y = -1, x = -1; char prompt[64] = "列を選択してください(1-5): ";
     while (1) {
-        if (game_over) { for (volatile int d = 0; d < 100000; d++); continue; }
+        if (game_over) { 
+         for (volatile int d = 0; d < 100000; d++);
+         continue; 
+         }
         int c = inkey(0);
         if (c <= 0 || c == 10 || c == 13) continue;
         seed += c;
@@ -155,7 +158,8 @@ void cpu_task() {
     int ty, tx;
     while (1) {
         if (game_over){ 
-            for (volatile int d = 0; d < 100000; d++);continue;//ゲームオーバー時は待機 
+            for (volatile int d = 0; d < 100000; d++);
+            continue;//ゲームオーバー時は待機 
         }
         for(volatile int d = 0; d < 200000; d++); //動作間隔
         P(SEM_BOARD);//盤面セマフォ取得
