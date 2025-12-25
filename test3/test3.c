@@ -500,102 +500,60 @@ void player_task() {
     }
 }
 
-//CPUタスク (思考時間のランダム化実装)
+// CPUインテリジェンス・タスク
 void cpu_task() {
     int ty, tx;
-    const int BASE_WAIT = 125000; // 約0.5秒相当のベースウェイト
-    
-    while (1) {
-        if (game_over) { for (volatile int d = 0; d < 200000; d++); continue; }
-        
-        // --- 思考時間のランダム化 (0.5秒〜1.5秒相当) ---
-        // BASE_WAIT + (0〜250000) の範囲でウェイトを決定
-        int random_wait = BASE_WAIT + (my_rand() % 250000);
-        for (volatile int d = 0; d < random_wait; d++); 
+    while (!game_over) {
+        // CPUの思考時間（難易度調整用）
+        for (volatile int d = 0; d < 800000; d++); 
 
-        P(SEM_BOARD);
-        if (game_over) { V(SEM_BOARD); continue; }
-        
         int placed = 0;
-        // 優先度に基づいた戦略的思考
-        if (get_strategic_move(4, 'X', &ty, &tx)) placed = 1;
-        else if (get_strategic_move(4, 'O', &ty, &tx)) placed = 1;
-        else if (get_strategic_move(3, 'X', &ty, &tx)) placed = 1;
-        else if (get_strategic_move(3, 'O', &ty, &tx)) placed = 1;
-        else if (get_strategic_move(2, 'X', &ty, &tx)) placed = 1;
-        else if (get_strategic_move(1, 'X', &ty, &tx)) placed = 1;
-        else {
-            int start = my_rand() % 25;
-            for (int i = 0; i < 25; i++) {
-                int idx = (start + i) % 25;
-                if (game_board.cells[idx / 5][idx % 5] == '.') { 
-                    ty = idx / 5; tx = idx % 5; placed = 1; break; 
-                }
-            }
-        }
-        
-        if (placed && !game_over) { 
-            game_board.cells[ty][tx] = 'X'; 
-            update_cell(ty, tx, 'X');
-            check_and_announce(0);
-            if (!game_over) update_msg("CPU moved.");
-        }
-        V(SEM_BOARD);
-    }
-}
-
-void bomber_task() {
-    int target = 0;
-    while (1) {
-        if (game_over) { for (volatile int d = 0; d < 300000; d++); continue; }
-        for (volatile int d = 0; d < 450000; d++); 
         P(SEM_BOARD);
-        if (game_over) { V(SEM_BOARD); continue; }
-        int ty = target / BOARD_SIZE, tx = target % BOARD_SIZE;
-        int changed = 0;
-        if (my_rand() % 100 < 20) {
-            int dy[] = {0, 0, 1, -1, 0}, dx[] = {0, 1, 0, 0, -1};
-            for (int i = 0; i < 5; i++) {
-                int ny = ty + dy[i], nx = tx + dx[i];
-                if (is_valid(ny, nx) && game_board.cells[ny][nx] != '.') {
-                    game_board.cells[ny][nx] = '.';
-                    update_cell(ny, nx, '.');
-                    changed = 1;
+
+        /* 優先度ロジックの実装 */
+        
+        // 1. CPUが4つ並んでいる -> 5つ目をおいて勝利確定
+        if (get_end_position(4, 'X', &ty, &tx)) placed = 1;
+        
+        // 2. プレイヤーが4つ並んでいる -> 阻止する
+        else if (get_end_position(4, 'O', &ty, &tx)) placed = 1;
+        
+        // 3. CPUが3つ並んでいる -> 両端を伸ばす
+        else if (get_end_position(3, 'X', &ty, &tx)) placed = 1;
+        
+        // 4. プレイヤーが3つ並んでいる -> 阻止する
+        else if (get_end_position(3, 'O', &ty, &tx)) placed = 1;
+        
+        // 5. CPUが2つ並んでいる -> 伸ばす
+        else if (get_end_position(2, 'X', &ty, &tx)) placed = 1;
+        
+        // 6. CPUのマークの隣に置く（1つ並んでいる場合）
+        else if (get_end_position(1, 'X', &ty, &tx)) placed = 1;
+        
+        // 7. 条件に合う場所がなければ空いている場所を探す
+        else {
+            for (int i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
+                if (game_board.cells[i / BOARD_SIZE][i % BOARD_SIZE] == '.') {
+                    ty = i / BOARD_SIZE;
+                    tx = i % BOARD_SIZE;
+                    placed = 1;
+                    break;
                 }
             }
-            if(changed && !game_over) update_msg("!!! CROSS BOMB !!!");
-        } else {
-            if (game_board.cells[ty][tx] != '.') { 
-                game_board.cells[ty][tx] = '.'; 
-                update_cell(ty, tx, '.');
-                if(!game_over) update_msg("Bomb!!");
-            }
         }
-        target = (target + 1 + (my_rand() % 3)) % 25;
-        V(SEM_BOARD);
-    }
-}
 
-void retry_task() {
-    while (1) {
-        int c = inkey(0);
-        if (game_over && c > 0) {
-            if (c == 'y' || c == 'Y') {
-                P(SEM_BOARD);
-                init_game_state();
-                draw_board(0, "Reset Complete. 列を選択してください(1-5): ");
-                V(SEM_BOARD);
-            } 
-            else if (c == 'n' || c == 'N') {
-                P(SEM_UART);
-                my_write(0, "\033[2J\033[H\r\n [!] SHUTTING DOWN...\r\n");
-                V(SEM_UART);
-                P(SEM_BOARD); 
-                while(1); 
-            }
+        if (placed && !game_over) {
+            game_board.cells[ty][tx] = 'X';
+            V(SEM_BOARD);
+            draw_board(0, "CPU moved strategically!");
+        } else {
+            V(SEM_BOARD);
         }
-        if (game_over) { for (volatile int d = 0; d < 60000; d++); }
-        else { for (volatile int d = 0; d < 220000; d++); }
+    }
+
+    // ゲーム終了後の無限ループ
+    while (game_over) {
+        for (volatile int d = 0; d < 1800000; d++);
     }
 }
 
