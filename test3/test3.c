@@ -15,10 +15,10 @@ typedef struct {
 
 BOARD_DATA game_board;
 int game_over = 0;
-int is_hard_mode = 0; // 難易度フラグ
+int is_hard_mode = 0; //難易度フラグ
 static unsigned long seed = 12345;
 
-/* --- ユーティリティ --- */
+
 int my_rand() {
     seed = seed * 1103515245 + 12345;
     return (unsigned int)(seed / 65536) % 32768;
