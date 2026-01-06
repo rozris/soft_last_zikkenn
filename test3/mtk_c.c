@@ -8,7 +8,7 @@ void wakeup(int ch);
 void sched();
 void swtch();
 
-/* mtk_c.h で extern 宣言されたグローバル変数*/
+/* グローバル変数の定義 */
 TCB_TYPE task_tab[NUMTASK + 1];
 STACK_TYPE stacks[NUMTASK];
 TASK_ID_TYPE ready;
@@ -17,14 +17,14 @@ TASK_ID_TYPE new_task;
 TASK_ID_TYPE next_task;
 SEMAPHORE_TYPE semaphore[NUMSEMAPHORE];
 
-/*p_body(ch):Pシステムコールの本体*/
+/* p_body(ch): Pシステムコールの処理本体 */
 void p_body(int ch)
 {
 	*(char*)0x00d00039='A';
-    /*セマフォの値を減らす*/
+    /* セマフォカウンタのデクリメント */
     semaphore[ch].count--;
 
-    /*セマフォが獲得できなければ(count < 0)、sleepを実行して休眠状態に*/
+    /* セマフォが獲得できない場合(count < 0)、タスクを休眠状態へ移行 */
     if (semaphore[ch].count < 0){
         sleep(ch);
     }
@@ -32,14 +32,14 @@ void p_body(int ch)
 	return;
 }
 
-/*v_body(ch):Vシステムコールの本体*/
+/* v_body(ch): Vシステムコールの処理本体 */
 void v_body(int ch)
 {
 	*(char*)0x00d00039='B';
-    /*セマフォの値を増やす*/
+    /* セマフォカウンタのインクリメント */
     semaphore[ch].count++;
 
-    /*count<=0ならば、まだタスクがあるのでwakeupを実行*/
+    /* 待機中のタスクが存在する場合(count <= 0)、タスクを起床させる */
     if (semaphore[ch].count <= 0) {
         wakeup(ch);
     }
@@ -48,32 +48,32 @@ void v_body(int ch)
 }
 
 
-/*sleep(ch):タスクを休眠状態にしてタスクスイッチ*/
+/* sleep(ch): 自タスクを待機状態に遷移させタスクスイッチを実行 */
 void sleep(int ch){
 	*(char*)0x00d00039='C';
-    /*指定されたセマフォの待ち行列に、現在のタスクを追加*/
+    /* 対象セマフォの待ち行列に現在のタスクを追加 */
     addq(&semaphore[ch].task_list, curr_task);
     
-    /*next_taskの更新 (最高優先度の実行可能タスクを選択)*/
+    /* 次に実行すべきタスクの選定 */
     sched();
     
-    /*タスクを切り替える*/
+    /* コンテキストスイッチの実行 */
     swtch();
 	*(char*)0x00d00039='c';
 	return;
 }
 
-/*wakeup(ch):休眠状態のタスクを実行可能状態にする*/
+/* wakeup(ch): 待機状態のタスクを実行可能状態へ戻す */
 void wakeup(int ch){
 	*(char*)0x00d00039='D';
     TASK_ID_TYPE waiting_task;
     
-    /*セマフォの待ち行列が空でないとき実行*/
+    /* 待ち行列が空でないことを確認 */
     if(semaphore[ch].task_list != NULLTASKID){ // NULLTASKID = 0
-        /*セマフォの待ち行列から先頭のタスクを取り除く*/
+        /* 待ち行列の先頭タスクを取り出す */
         waiting_task = removeq(&semaphore[ch].task_list);
         
-        /*取り出したタスクを実行可能キュー(ready)に追加*/
+        /* 取り出したタスクを実行可能キューに追加 */
         addq(&ready, waiting_task);
     }
 	*(char*)0x00d00039='d';
@@ -85,22 +85,23 @@ void init_kernel(){
 	*(char*)0x00d00039='E';
     int i;
     
-    // TCBの初期化 (タスクID 1からNUMTASKまで、0番も便宜上初期化)
+    /* TCBテーブルの初期化 */
     for(i = 0; i <= NUMTASK; i++){
         task_tab[i].next = NULLTASKID;
-        task_tab[i].status = 0; // 0: 未使用
-        task_tab[i].priority = 0; // 初期値
-        task_tab[i].stack_ptr = NULL; // 初期値
+        task_tab[i].status = 0; // 0: FREE
+        task_tab[i].priority = 0;
+        task_tab[i].stack_ptr = NULL;
     }
 
-    // readyキューの初期化
+    /* 実行可能キューの初期化 */
     ready = NULLTASKID;
-    // 割り込みベクタの初期化 (mtk_c.h 依存)
+    
+    /* トラップベクタの設定 */
     *(void **)0x00000084 = pv_handler;
 
-    // セマフォの初期化
+    /* セマフォの初期化 */
     for(i = 0; i < NUMSEMAPHORE; i++) {
-        semaphore[i].count = 1;      /* 初期値1 (使用可能) */
+        semaphore[i].count = 1;      /* バイナリセマフォとして初期化 */
         semaphore[i].task_list = NULLTASKID;
         semaphore[i].nst = 0;
     }
@@ -111,32 +112,31 @@ void init_kernel(){
 
 void set_task(void (*func)()) {
 	*(char*)0x00d00039='F';
-    TASK_ID_TYPE new_task = NULLTASKID; // 初期値NULLTASKID
+    TASK_ID_TYPE new_task = NULLTASKID;
     int i;
 
-    /* 1. タスク IDの決定 (空きスロット探索) */
+    /* 空きTCBスロットの検索 */
     for(i = 1; i <= NUMTASK; i++) {
-        /* status == 0 を未使用と仮定 */
         if (task_tab[i].status == 0) {
             new_task = i;
             break;
         }
     }
     
-    // 空きスロットが見つからなかった場合
+    /* 空きスロットがない場合は終了 */
     if (new_task == NULLTASKID) {
         return;
     }
 
-    /* 2. TCBの更新 */
+    /* TCBの設定 */
     task_tab[new_task].task_addr = func;
-    task_tab[new_task].status = 1; /* 1: 使用中/実行可能 */
-    task_tab[new_task].priority = 0; // 優先度もここで設定されるべき
+    task_tab[new_task].status = 1; /* 1: READY/RUNNING */
+    task_tab[new_task].priority = 0; 
     
-    /* 3. スタックの初期化 */
+    /* スタック領域の初期化 */
     task_tab[new_task].stack_ptr = init_stack(new_task);
 
-    /* 4. キューへの登録 */
+    /* 実行可能キューへ登録 */
     addq(&ready, new_task);
 	*(char*)0x00d00039='f';
 	return;
@@ -145,29 +145,25 @@ void set_task(void (*func)()) {
 void *init_stack(int id) {
     *(char*)0x00d00039='G';
     
-    /*バイト単位で計算するために char* にキャスト */
-    /* スタックの底 (一番大きいアドレス) */
+    /* スタックポインタの初期値を設定 (スタック底のアドレス) */
     char *sp = (char *)&stacks[id - 1].sstack[STKSIZE]; 
 
-    /*initial PC (4 bytes)*/
-    /* char* なので単純に-4で4バイト戻る */
+    /* 初期PCの格納 */
     sp -= 4;
     *(int *)sp = (int)task_tab[id].task_addr;
 
-    /* initial SR (2 bytes) */
-    /* char* なので -2 で2バイト戻る。これでPCの直前に隙間なく配置される */
+    /* 初期SRの格納 (ユーザモード、全割り込み許可) */
     sp -= 2;
     *(short *)sp = 0x2000;
     
-    /*15本のレジスタ (D0-D7, A0-A6)*/
-    /* 4バイト * 15本 = 60バイト */
+    /* 汎用レジスタ保存領域の確保 (D0-D7, A0-A6) */
     sp -= 60;
     
-    /*initial USP (4 bytes)*/
+    /* 初期USPの格納 */
     sp -= 4;
     *(int *)sp = (int)&stacks[id - 1].ustack[STKSIZE];
 
-    /* 初期化完了時点のスタックポインタ(SSP)を返す */
+    /* 設定後のスタックポインタを返す */
     *(char*)0x00d00039='g'; 
     return (void *)sp;
 }
@@ -175,15 +171,13 @@ void *init_stack(int id) {
 
 void begin_sch() {
 	*(char*)0x00d00039='H';
-    /* 1. 最初のタスクの決定 */
+    /* 実行開始タスクの取り出し */
     curr_task = removeq(&ready);
 
-    /* 2. タイマの設定 */
+    /* ハードウェアタイマの起動 */
     init_timer();
 
-    /* 3. 最初のタスクの起動 */
-    /* first_task()は、curr_taskのTCBからスタックポインタを取得し、
-       スタックに積まれたレジスタ値を復元してタスクを開始する (戻ってこない) */
+    /* 最初のタスクの実行開始 */
     first_task();
 	*(char*)0x00d00039='h';
 	return;
@@ -192,15 +186,14 @@ void begin_sch() {
 
 
 
-/* sched() : タスクのスケジュール関数 */
-/*ready キューの先頭のタスク ID を取り出し，next task にセットする，*/
-/*取り出した next task が NULLTASKID の場合は、無限ループに入る */
+/* sched(): 次に実行するタスクを選択する */
 void sched() {
 	*(char*)0x00d00039='I';
 	TASK_ID_TYPE tid;
 	
 	tid = removeq(&ready);
 	
+	/* 実行可能タスクが存在しない場合は待機 */
 	if (tid == NULLTASKID) {
 	while (1);
 	}
@@ -210,8 +203,7 @@ void sched() {
 	return;
 }
 
-/* addq() : タスクのキューの最後尾へのTCBの追加 */
-/* 引数にキューへのポインタとタスクの ID を取り，その TCB をキューの最後尾に登録する． */
+/* addq(): 指定されたキューの末尾にタスクを追加する */
 void addq(TASK_ID_TYPE *head, TASK_ID_TYPE tid) {
 	*(char*)0x00d00039='J';
 	TASK_ID_TYPE p = *head;
@@ -232,8 +224,7 @@ void addq(TASK_ID_TYPE *head, TASK_ID_TYPE tid) {
 	return;
 }
 
-/* removeq() : タスクのキューの先頭からのTCBの除去 */
-/* 引数にキューへのポインタを取り，先頭のタスクをキューから取り除いてその ID を返す．*/
+/* removeq(): 指定されたキューの先頭からタスクを取り出す */
 TASK_ID_TYPE removeq(TASK_ID_TYPE *head) {
 	*(char*)0x00d00039='K';
 
@@ -244,37 +235,12 @@ TASK_ID_TYPE removeq(TASK_ID_TYPE *head) {
 	return t;
 }
 
-/*
-//テーマ3UART等関連処理
-#define REGBASE 0xFFF000
-#define IMR     (*(volatile unsigned long *)(REGBASE + 0x304))
-#define USTCNT2 (*(volatile unsigned short *)(REGBASE + 0x910))
-#define UBAUD2  (*(volatile unsigned short *)(REGBASE + 0x912))
-#define URX1    (*(volatile unsigned short *)(REGBASE + 0x904))
-#define UTX1    (*(volatile unsigned short *)(REGBASE + 0x906))
-#define URX2    (*(volatile unsigned short *)(REGBASE + 0x914))
-#define UTX2    (*(volatile unsigned short *)(REGBASE + 0x916))
-
-#define IMR_UART2_MASK 0x00001000
-
-int set_ipl(int level) {
-    int old_sr;
-    __asm__ volatile ("move.w %%sr, %0" : "=d" (old_sr));
-    if (level == 7) __asm__ volatile ("move.w #0x2700, %%sr" : :);
-    return old_sr;
-}
-void restore_ipl(int old_sr) {
-    __asm__ volatile ("move.w %0, %%sr" : : "d" (old_sr));
-}
-
-*/
-/* UART2初期化 */
+/* UART2初期化処理 */
 void init_uart2(void) {
     int lock = set_ipl(7);
-    USTCNT2 = 0x0000;   /* Reset */
-    USTCNT2 = 0xE100;   /* RX/TX Enable */
-    UBAUD2  = 0x0126;   /* 38400 bps */
-    IMR &= ~0x00001000; /* UART2割り込み許可 */
+    USTCNT2 = 0x0000;   /* 通信制御レジスタリセット */
+    USTCNT2 = 0xE100;   /* 送受信有効化 */
+    UBAUD2  = 0x0126;   /* ボーレート設定: 38400 bps */
+    IMR &= ~0x00001000; /* UART2割り込みマスク解除 */
     restore_ipl(lock);
 }
-
