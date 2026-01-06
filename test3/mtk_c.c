@@ -145,25 +145,25 @@ void set_task(void (*func)()) {
 void *init_stack(int id) {
     *(char*)0x00d00039='G';
     
-    /* 【修正1】バイト単位で計算するために char* にキャスト */
+    /*バイト単位で計算するために char* にキャスト */
     /* スタックの底 (一番大きいアドレス) */
     char *sp = (char *)&stacks[id - 1].sstack[STKSIZE]; 
 
-    /* 1. initial PC (4 bytes) */
-    /* char* なので単純に -4 で4バイト戻る */
+    /*initial PC (4 bytes)*/
+    /* char* なので単純に-4で4バイト戻る */
     sp -= 4;
     *(int *)sp = (int)task_tab[id].task_addr;
 
-    /* 2. initial SR (2 bytes) */
+    /* initial SR (2 bytes) */
     /* char* なので -2 で2バイト戻る。これでPCの直前に隙間なく配置される */
     sp -= 2;
     *(short *)sp = 0x2000;
     
-    /* 3. 15本のレジスタ (D0-D7, A0-A6) */
+    /*15本のレジスタ (D0-D7, A0-A6)*/
     /* 4バイト * 15本 = 60バイト */
     sp -= 60;
     
-    /* 4. initial USP (4 bytes) */
+    /*initial USP (4 bytes)*/
     sp -= 4;
     *(int *)sp = (int)&stacks[id - 1].ustack[STKSIZE];
 
@@ -193,8 +193,8 @@ void begin_sch() {
 
 
 /* sched() : タスクのスケジュール関数 */
-/* ・ready キューの先頭のタスク ID を取り出し，next task にセットする，*/
-/* ・取り出した next task が NULLTASKID の場合は、無限ループに入る */
+/*ready キューの先頭のタスク ID を取り出し，next task にセットする，*/
+/*取り出した next task が NULLTASKID の場合は、無限ループに入る */
 void sched() {
 	*(char*)0x00d00039='I';
 	TASK_ID_TYPE tid;
@@ -244,6 +244,7 @@ TASK_ID_TYPE removeq(TASK_ID_TYPE *head) {
 	return t;
 }
 
+/*
 //テーマ3UART等関連処理
 #define REGBASE 0xFFF000
 #define IMR     (*(volatile unsigned long *)(REGBASE + 0x304))
@@ -262,11 +263,11 @@ int set_ipl(int level) {
     if (level == 7) __asm__ volatile ("move.w #0x2700, %%sr" : :);
     return old_sr;
 }
-
 void restore_ipl(int old_sr) {
     __asm__ volatile ("move.w %0, %%sr" : : "d" (old_sr));
 }
 
+*/
 /* UART2初期化 */
 void init_uart2(void) {
     int lock = set_ipl(7);
