@@ -15,9 +15,8 @@ typedef struct {
 
 BOARD_DATA game_board;
 int game_over = 0;
-int is_hard_mode = 0; //難易度フラグ
+int is_hard_mode = 0; // 難易度フラグ
 static unsigned long seed = 12345;
-
 
 int my_rand() {
     seed = seed * 1103515245 + 12345;
@@ -64,15 +63,18 @@ int get_strategic_move(int length, char mark, int *ry, int *rx) {
 /* --- 描画・判定 --- */
 char check_winner() {
     for (int i = 0; i < BOARD_SIZE; i++) {
+        // 行判定
         if (game_board.cells[i][0] != '.' && game_board.cells[i][0] == game_board.cells[i][1] && game_board.cells[i][1] == game_board.cells[i][2] && game_board.cells[i][2] == game_board.cells[i][3] && game_board.cells[i][3] == game_board.cells[i][4]) return game_board.cells[i][0];
+        // 列判定
         if (game_board.cells[0][i] != '.' && game_board.cells[0][i] == game_board.cells[1][i] && game_board.cells[1][i] == game_board.cells[2][i] && game_board.cells[2][i] == game_board.cells[3][i] && game_board.cells[3][i] == game_board.cells[4][i]) return game_board.cells[0][i];
     }
     if (game_board.cells[2][2] != '.') {
+        // 斜め判定
         if (game_board.cells[0][0] == game_board.cells[1][1] && game_board.cells[1][1] == game_board.cells[2][2] && game_board.cells[2][2] == game_board.cells[3][3] && game_board.cells[3][3] == game_board.cells[4][4]) return game_board.cells[2][2];
         if (game_board.cells[0][4] == game_board.cells[1][3] && game_board.cells[1][3] == game_board.cells[2][2] && game_board.cells[2][2] == game_board.cells[3][1] && game_board.cells[3][1] == game_board.cells[4][0]) return game_board.cells[2][2];
     }
     for (int i = 0; i < 25; i++) if (game_board.cells[i / 5][i % 5] == '.') return 0;
-    return 'D';
+    return 'D'; // 引き分け
 }
 
 void update_cell(int y, int x, char mark) {
@@ -86,18 +88,18 @@ void update_cell(int y, int x, char mark) {
 
 void update_msg(char* msg) {
     P(SEM_UART);
-    my_write(0, "\033[19;1H\r ");
+    my_write(0, "\033[19;1H\r                                        "); // 行クリア用
+    my_write(0, "\033[19;1H ");
     my_write(0, msg);
-    my_write(0, "                    "); 
     V(SEM_UART);
 }
 
 void draw_board(int fd, char* msg) {
     P(SEM_UART);
-    my_write(fd, "\033[2J\033[H五目並べの達人\r\n");
-    my_write(fd, "プレイヤー: O | CPU: X | 爆弾: 定期的に盤面を破壊します\r\n");
-    my_write(fd, "マスは早い者勝ちです。列・行の順に指定してください\r\n\r\n");
-    my_write(fd, "       1   2   3   4   5\r\n    +---+---+---+---+---+\r\n");
+    my_write(fd, "\033[2J\033[H【 五目並べの達人 】\r\n");
+    my_write(fd, "あなた: O  |  CPU: X  |  時限爆弾にご注意ください\r\n");
+    my_write(fd, "1から5の数字キーで場所を指定してください（列、行の順）\r\n\r\n");
+    my_write(fd, "        1   2   3   4   5\r\n    +---+---+---+---+---+\r\n");
     for (int i = 0; i < BOARD_SIZE; i++) {
         char row[64];
         sprintf(row, "  %d | . | . | . | . | . |\r\n", i + 1);
@@ -119,12 +121,14 @@ void check_and_announce(int fd) {
         game_over = 1;
         P(SEM_UART);
         my_write(fd, "\033[18;1H\033[J"); 
-        if (winner == 'O') my_write(fd, " [!] YOU WIN!");
-        else if (winner == 'X') {
-            my_write(fd, " G A M E O V E R\r\n....................../´¯/)\n....................,/¯../\n.................../..../\n............./´¯'...'/´¯¯`·¸\n........../'/.../..../......./¨¯\\\n........('(...'...'.... ¯~/'...')\n.........\\.................'...../\n..........''...\\.......... _.·´\n............\\..............(\n..............\\.............\\...\n");
-        } 
-        else my_write(fd, "DRAW-GAME");
-        my_write(fd, "\r\n リトライしますか? (Y/N): ");
+        if (winner == 'O') {
+            my_write(fd, " おめでとうございます！あなたの勝利です。");
+        } else if (winner == 'X') {
+            my_write(fd, " 残念ながら敗北してしまいました。");
+        } else {
+            my_write(fd, " 引き分けです。");
+        }
+        my_write(fd, "\r\n もう一度遊びますか？ (Y: はい / N: いいえ): ");
         V(SEM_UART);
     }
 }
@@ -132,7 +136,7 @@ void check_and_announce(int fd) {
 /* --- タスク実装 --- */
 
 void player_task() {
-    int y = -1, x = -1; char prompt[64] = "列を選択してください(1-5): ";
+    int y = -1, x = -1; char prompt[80] = "列を選択してください(1-5): ";
     while (1) {
         if (game_over) { for (volatile int d = 0; d < 150000; d++); continue; }
         int c = inkey(0);
@@ -140,19 +144,22 @@ void player_task() {
         seed += c;
         if (c >= '1' && c <= '5') {
             if (y == -1) { 
-                y = c - '1'; sprintf(prompt, " %d 列目選択済み. 行を選択してください: ", y+1);
+                y = c - '1'; 
+                sprintf(prompt, "%d列目を選択中。行を選択してください(1-5): ", y + 1);
                 update_msg(prompt);
             } else {
                 x = c - '1'; P(SEM_BOARD);
                 if (!game_over) {
                     if (game_board.cells[y][x] == '.') { 
                         game_board.cells[y][x] = 'O'; update_cell(y, x, 'O');
-                        sprintf(prompt, "(%d, %d)に設置、次の列を選択してください ", y+1, x+1);
+                        sprintf(prompt, "(%d, %d) に配置しました。次の列を選んでください。", y + 1, x + 1);
                         check_and_announce(0);
-                    } else { sprintf(prompt, "そのマスは埋まっています!: "); }
+                    } else { 
+                        sprintf(prompt, "そのマスには既に石が置かれています。"); 
+                    }
                 }
-                y=-1; x=-1; V(SEM_BOARD);
-                if(!game_over) update_msg(prompt);
+                y = -1; x = -1; V(SEM_BOARD);
+                if (!game_over) update_msg(prompt);
             }
         }
     }
@@ -163,7 +170,6 @@ void cpu_task() {
     while (1) {
         if (game_over) { for (volatile int d = 0; d < 200000; d++); continue; }
         
-        // 思考時間のランダム化（0.5〜1.5秒、Hard Mode時は高速）
         int base = is_hard_mode ? 50000 : 125000;
         int span = is_hard_mode ? 100000 : 250000;
         int random_wait = base + (my_rand() % span);
@@ -190,7 +196,7 @@ void cpu_task() {
         if (placed && !game_over) {
             game_board.cells[ty][tx] = 'X'; update_cell(ty, tx, 'X');
             check_and_announce(0);
-            if(!game_over) update_msg("CPU moved strategically.");
+            if (!game_over) update_msg("CPUが手を打ちました。あなたの番です。");
         }
         V(SEM_BOARD);
     }
@@ -215,10 +221,10 @@ void bomber_task() {
                     game_board.cells[ny][nx] = '.'; update_cell(ny, nx, '.'); changed = 1;
                 }
             }
-            if(changed && !game_over) update_msg("!!! CROSS BOMB !!!");
+            if (changed && !game_over) update_msg("警告：十字爆弾が作動しました！");
         } else if (game_board.cells[ty][tx] != '.') { 
             game_board.cells[ty][tx] = '.'; update_cell(ty, tx, '.');
-            if(!game_over) update_msg("Bomb!!");
+            if (!game_over) update_msg("爆弾：マスが破壊されました。");
         }
         target = (target + 1 + (my_rand() % 3)) % 25;
         V(SEM_BOARD);
@@ -234,10 +240,10 @@ void retry_task() {
                 is_hard_mode = (c == 'Y');
                 game_over = 0;
                 for (int i = 0; i < BOARD_SIZE; i++) for (int j = 0; j < BOARD_SIZE; j++) game_board.cells[i][j] = '.';
-                draw_board(0, is_hard_mode ? ">> HARD MODE ACTIVATED << Row (1-5):" : "Reset Complete. Row (1-5):");
+                draw_board(0, is_hard_mode ? "ハードモードで開始します。列を選択してください: " : "盤面をリセットしました。列を選択してください: ");
                 V(SEM_BOARD);
             } else if (c == 'n' || c == 'N') {
-                P(SEM_UART); my_write(0, "\033[2J\033[H\r\n [!] SHUTTING DOWN...\r\n"); V(SEM_UART);
+                P(SEM_UART); my_write(0, "\033[2J\033[H\r\n ゲームを終了します。お疲れ様でした。\r\n"); V(SEM_UART);
                 P(SEM_BOARD); while(1); 
             }
         }
@@ -248,8 +254,11 @@ void retry_task() {
 int main(void) {
     init_kernel();
     for (int i = 0; i < BOARD_SIZE; i++) for (int j = 0; j < BOARD_SIZE; j++) game_board.cells[i][j] = '.';
-    set_task(player_task); set_task(cpu_task); set_task(bomber_task); set_task(retry_task);
-    draw_board(0, "列を選択してください(1-5): ");
+    set_task(player_task); 
+    set_task(cpu_task); 
+    set_task(bomber_task); 
+    set_task(retry_task);
+    draw_board(0, "ゲームを開始します。列を選択してください(1-5): ");
     begin_sch();
     return 0;
 }
