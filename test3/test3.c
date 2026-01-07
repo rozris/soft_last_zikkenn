@@ -90,10 +90,11 @@ void update_cell(int y, int x, char mark) {
 
 /*画面下部のメッセージ領域の更新*/
 void update_msg(char* msg) {
+    if (game_over) return; // ゲーム終了後は更新を停止
     P(SEM_UART);
-    my_write(0, "\033[19;1H\r                                        "); 
-    my_write(0, "\033[19;1H ");
+    my_write(0, "\033[19;1H\033[K "); 
     my_write(0, msg);
+    my_write(0, "\033[22;1H"); 
     V(SEM_UART);
 }
 
