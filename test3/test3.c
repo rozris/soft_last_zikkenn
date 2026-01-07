@@ -169,6 +169,7 @@ void player_task() {
 
 /* CPUタスク */
 void cpu_task() {
+    char log_buf[64];
     int ty, tx;
     while (1) {
         if (game_over) { for (volatile int d = 0; d < 200000; d++); continue; }
