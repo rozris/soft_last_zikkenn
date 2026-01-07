@@ -203,7 +203,7 @@ void cpu_task() {
             /*UART2へのログ出力*/
             sprintf(log_buf, "CPU動作(%d, %d)\r\n", ty + 1, tx + 1);
             P(SEM_UART);
-            my_write(1, log_buf); // fd=1(UART2)へ出力
+            my_write(4, log_buf); // fd=1(UART2)へ出力
             V(SEM_UART);
             check_and_announce(0);
         }
@@ -243,7 +243,7 @@ void bomber_task() {
                 /*UART2へのログ出力*/
                 sprintf(log_buf, "十字爆弾爆発(%d, %d)\r\n", ty + 1, tx + 1);
                 P(SEM_UART);
-                my_write(1, log_buf); // fd=1(UART2)へ出力
+                my_write(4, log_buf); // fd=1(UART2)へ出力
                 V(SEM_UART);
             }
         } 
@@ -256,7 +256,7 @@ void bomber_task() {
                 /*UART2へのログ出力*/
                 sprintf(log_buf, "爆弾爆発(%d, %d)\r\n", ty + 1, tx + 1);
                 P(SEM_UART);
-                my_write(1, log_buf); // fd=1(UART2)へ出力
+                my_write(4, log_buf); // fd=1(UART2)へ出力
                 V(SEM_UART);
             }
         }
