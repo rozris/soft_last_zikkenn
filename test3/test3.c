@@ -199,15 +199,22 @@ void cpu_task() {
 
         if (placed && !game_over) {
             game_board.cells[ty][tx] = 'X'; update_cell(ty, tx, 'X');
+            /*UART2へのログ出力*/
+            sprintf(log_buf, "CPU動作(%d, %d)\r\n", ty + 1, tx + 1);
+            P(SEM_UART);
+            my_write(1, log_buf); // fd=1(UART2)へ出力
+            V(SEM_UART);
             check_and_announce(0);
         }
         V(SEM_BOARD);
     }
 }
 
-/*爆弾タスク：盤面をランダムに破壊*/
+/* 爆弾タスク：盤面をランダムに破壊 ＋ UART2へログ出力 */
 void bomber_task() {
     int target = 0;
+    char log_buf[64]; // UART2出力用のバッファ
+    
     while (1) {
         if (game_over) { for (volatile int d = 0; d < 300000; d++); continue; }
         int wait_time = is_hard_mode ? 200000 : 450000;
@@ -218,21 +225,41 @@ void bomber_task() {
         int ty = target / BOARD_SIZE, tx = target % BOARD_SIZE;
         int changed = 0;
         
-        /*20%の確率で十字爆弾*/
+        /* 20%の確率で十字爆弾 */
         if (my_rand() % 100 < 20) {
             int dy[] = {0, 0, 1, -1, 0}, dx[] = {0, 1, 0, 0, -1};
             for (int i = 0; i < 5; i++) {
                 int ny = ty + dy[i], nx = tx + dx[i];
                 if (is_valid(ny, nx) && game_board.cells[ny][nx] != '.') {
-                    game_board.cells[ny][nx] = '.'; update_cell(ny, nx, '.'); changed = 1;
+                    game_board.cells[ny][nx] = '.'; 
+                    update_cell(ny, nx, '.'); //画面上の石を消す
+                    changed = 1;
                 }
             }
-            if (changed && !game_over) update_msg("! ! ! どーん ! ! !");
+            if (changed && !game_over) {
+                update_msg("! ! ! どーん ! ! !");
+                
+                /*UART2へのログ出力*/
+                sprintf(log_buf, "十字爆弾爆発(%d, %d)\r\n", ty + 1, tx + 1);
+                P(SEM_UART);
+                my_write(1, log_buf); // fd=1(UART2)へ出力
+                V(SEM_UART);
+            }
         } 
         else if (game_board.cells[ty][tx] != '.') { 
-            game_board.cells[ty][tx] = '.'; update_cell(ty, tx, '.');
-            if (!game_over) update_msg("どーん!");
+            game_board.cells[ty][tx] = '.'; 
+            update_cell(ty, tx, '.');
+            if (!game_over) {
+                update_msg("どーん!"); // UART1への通知
+                
+                /*UART2へのログ出力*/
+                sprintf(log_buf, "爆弾爆発(%d, %d)\r\n", ty + 1, tx + 1);
+                P(SEM_UART);
+                my_write(1, log_buf); // fd=1(UART2)へ出力
+                V(SEM_UART);
+            }
         }
+        
         target = (target + 1 + (my_rand() % 3)) % 25;
         V(SEM_BOARD);
     }
@@ -263,7 +290,9 @@ void retry_task() {
 int main(void) {
     init_kernel();
     for (int i = 0; i < BOARD_SIZE; i++) for (int j = 0; j < BOARD_SIZE; j++) game_board.cells[i][j] = '.';
-    
+    P(SEM_UART);
+    my_write(1, "\033[2J\033[H--- デバックログ  ---\r\n");
+    V(SEM_UART);
     set_task(player_task); 
     set_task(cpu_task); 
     set_task(bomber_task); 
