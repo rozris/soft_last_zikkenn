@@ -307,7 +307,7 @@ int main(void) {
     init_kernel();
     for (int i = 0; i < BOARD_SIZE; i++) for (int j = 0; j < BOARD_SIZE; j++) game_board.cells[i][j] = '.';
     P(SEM_UART);
-    my_write(1, "\033[2J\033[H--- デバックログ  ---\r\n");
+    my_write(4, "\033[2J\033[H--- デバックログ  ---\r\n");
     V(SEM_UART);
     set_task(player_task); 
     set_task(cpu_task); 
