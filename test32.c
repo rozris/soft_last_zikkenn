@@ -213,8 +213,7 @@ void cpu_task() {
     }
 }
 
-/* 爆弾タスク：盤面をランダムに破壊 ＋ UART2へログ出力 */
-/* 爆弾タスク：石が置かれている場所からランダムに破壊対象を選択 ＋ UART2へログ出力 */
+/*爆弾タスク*/
 void bomber_task() {
     char log_buf[64];
     int occupied_y[25], occupied_x[25]; // 石がある座標を保持する配列
