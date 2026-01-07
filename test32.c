@@ -104,7 +104,7 @@ void draw_board(int fd, char* msg) {
     my_write(fd, "\033[2J\033[H【 五目並べの達人 】\r\n");
     my_write(fd, "あなた: O  |  CPU: X  |  爆弾に注意! \r\n");
     my_write(fd, "1から5の数字キーで場所を指定してください（列、行の順）\r\n\r\n");
-    my_write(fd, "        1   2   3   4   5\r\n    +---+---+---+---+---+\r\n");
+    my_write(fd, "      1   2   3   4   5\r\n    +---+---+---+---+---+\r\n");
     for (int i = 0; i < BOARD_SIZE; i++) {
         char row[64];
         sprintf(row, "  %d | . | . | . | . | . |\r\n", i + 1);
@@ -175,8 +175,8 @@ void cpu_task() {
     while (1) {
         if (game_over) { for (volatile int d = 0; d < 200000; d++); continue; }
         
-        int base = is_hard_mode ? 50000  : 125000;
-        int span = is_hard_mode ? 100000 : 250000;
+        int base = is_hard_mode ? 50000  : 90000;
+        int span = is_hard_mode ? 90000 : 200000;
         int random_wait = base + (my_rand() % span);
         for (volatile int d = 0; d < random_wait; d++); 
 
@@ -295,7 +295,7 @@ int main(void) {
     P(SEM_UART);
     my_write(1, "\033[2J\033[H--- デバックログ  ---\r\n");
     V(SEM_UART);
-    set_task(playerjuhku_task); 
+    set_task(player_task); 
     set_task(cpu_task); 
     set_task(bomber_task); 
     set_task(retry_task);
