@@ -216,7 +216,7 @@ void cpu_task() {
 /*爆弾タスク*/
 void bomber_task() {
     char log_buf[64];
-    int occupied_y[25], occupied_x[25]; // 石がある座標を保持する配列
+    int occupied_y[25], occupied_x[25]; //駒がある座標を保持する配列
     int count;
     while (1) {
         if (game_over) { for (volatile int d = 0; d < 300000; d++); continue; }
@@ -226,7 +226,7 @@ void bomber_task() {
         P(SEM_BOARD);
         if (game_over) { V(SEM_BOARD); continue; }
 
-        /*石が置かれている座標をリストアップ*/
+        /*駒が置かれている座標をリストアップ*/
         count = 0;
         for (int y = 0; y < BOARD_SIZE; y++) {
             for (int x = 0; x < BOARD_SIZE; x++) {
@@ -252,7 +252,7 @@ void bomber_task() {
                     int ny = ty + dy[i], nx = tx + dx[i];
                     if (is_valid(ny, nx) && game_board.cells[ny][nx] != '.') {
                         game_board.cells[ny][nx] = '.'; 
-                        update_cell(ny, nx, '.'); // 画面上の石を消す
+                        update_cell(ny, nx, '.'); // 画面上の駒を消す
                         changed = 1;
                     }
                 }
