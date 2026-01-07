@@ -213,10 +213,11 @@ void cpu_task() {
 }
 
 /* 爆弾タスク：盤面をランダムに破壊 ＋ UART2へログ出力 */
+/* 爆弾タスク：石が置かれている場所からランダムに破壊対象を選択 ＋ UART2へログ出力 */
 void bomber_task() {
-    int target = 0;
-    char log_buf[64]; // UART2出力用のバッファ
-    
+    char log_buf[64];
+    int occupied_y[25], occupied_x[25]; // 石がある座標を保持する配列
+    int count;
     while (1) {
         if (game_over) { for (volatile int d = 0; d < 300000; d++); continue; }
         int wait_time = is_hard_mode ? 200000 : 450000;
@@ -224,45 +225,58 @@ void bomber_task() {
         
         P(SEM_BOARD);
         if (game_over) { V(SEM_BOARD); continue; }
-        int ty = target / BOARD_SIZE, tx = target % BOARD_SIZE;
-        int changed = 0;
-        
-        /* 20%の確率で十字爆弾 */
-        if (my_rand() % 100 < 20) {
-            int dy[] = {0, 0, 1, -1, 0}, dx[] = {0, 1, 0, 0, -1};
-            for (int i = 0; i < 5; i++) {
-                int ny = ty + dy[i], nx = tx + dx[i];
-                if (is_valid(ny, nx) && game_board.cells[ny][nx] != '.') {
-                    game_board.cells[ny][nx] = '.'; 
-                    update_cell(ny, nx, '.'); //画面上の石を消す
-                    changed = 1;
+
+        /* 石が置かれている座標をすべてリストアップ*/
+        count = 0;
+        for (int y = 0; y < BOARD_SIZE; y++) {
+            for (int x = 0; x < BOARD_SIZE; x++) {
+                if (game_board.cells[y][x] != '.') {
+                    occupied_y[count] = y;
+                    occupied_x[count] = x;
+                    count++;
                 }
             }
-            if (changed && !game_over) {
-                update_msg("! ! ! どーん ! ! !");
-                
-                /*UART2へのログ出力*/
-                sprintf(log_buf, "十字爆弾爆発(%d, %d)\r\n", ty + 1, tx + 1);
-                P(SEM_UART);
-                my_write(4, log_buf); // fd=1(UART2)へ出力
-                V(SEM_UART);
-            }
-        } 
-        else if (game_board.cells[ty][tx] != '.') { 
-            game_board.cells[ty][tx] = '.'; 
-            update_cell(ty, tx, '.');
-            if (!game_over) {
-                update_msg("どーん!"); // UART1への通知
-                
-                /*UART2へのログ出力*/
-                sprintf(log_buf, "爆弾爆発(%d, %d)\r\n", ty + 1, tx + 1);
-                P(SEM_UART);
-                my_write(4, log_buf); // fd=1(UART2)へ出力
-                V(SEM_UART);
+        }
+        /*爆発処理*/
+        if (count > 0) {
+            //リストの中からランダムに1つ選択
+            int idx = my_rand() % count;
+            int ty = occupied_y[idx];
+            int tx = occupied_x[idx];
+            int changed = 0;
+
+            /* 20%の確率で十字爆弾 */
+            if (my_rand() % 100 < 20) {
+                int dy[] = {0, 0, 1, -1, 0}, dx[] = {0, 1, 0, 0, -1};
+                for (int i = 0; i < 5; i++) {
+                    int ny = ty + dy[i], nx = tx + dx[i];
+                    if (is_valid(ny, nx) && game_board.cells[ny][nx] != '.') {
+                        game_board.cells[ny][nx] = '.'; 
+                        update_cell(ny, nx, '.'); // 画面上の石を消す
+                        changed = 1;
+                    }
+                }
+                if (changed && !game_over) {
+                    update_msg("! ! ! どーん ! ! ! ");      
+                    sprintf(log_buf, "十字爆弾爆発(%d, %d)\r\n", ty + 1, tx + 1);
+                    P(SEM_UART);
+                    my_write(4, log_buf); 
+                    V(SEM_UART);
+                }
+            } 
+            /*通常爆弾*/
+            else {
+                game_board.cells[ty][tx] = '.'; 
+                update_cell(ty, tx, '.');
+                if (!game_over) {
+                    update_msg("どーん!");                   
+                    sprintf(log_buf, "爆弾爆発(%d, %d)\r\n", ty + 1, tx + 1);
+                    P(SEM_UART);
+                    my_write(4, log_buf);
+                    V(SEM_UART);
+                }
             }
         }
-        
-        target = (target + 1 + (my_rand() % 3)) % 25;
         V(SEM_BOARD);
     }
 }
