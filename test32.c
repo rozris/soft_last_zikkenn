@@ -137,6 +137,7 @@ void check_and_announce(int fd) {
 
 /*プレイヤー入力を処理するタスク*/
 void player_task() {
+    /*入力まち*/
     int y = -1, x = -1; char prompt[80] = "列を選択してください(1-5): ";
     while (1) {
         if (game_over) { for (volatile int d = 0; d < 150000; d++); continue; }
@@ -174,7 +175,7 @@ void cpu_task() {
     int ty, tx;
     while (1) {
         if (game_over) { for (volatile int d = 0; d < 200000; d++); continue; }
-        
+        /*行動タイミング*/
         int base = is_hard_mode ? 50000  : 90000;
         int span = is_hard_mode ? 90000 : 200000;
         int random_wait = base + (my_rand() % span);
@@ -226,7 +227,7 @@ void bomber_task() {
         P(SEM_BOARD);
         if (game_over) { V(SEM_BOARD); continue; }
 
-        /* 石が置かれている座標をすべてリストアップ*/
+        /*石が置かれている座標をリストアップ*/
         count = 0;
         for (int y = 0; y < BOARD_SIZE; y++) {
             for (int x = 0; x < BOARD_SIZE; x++) {
